@@ -38,6 +38,7 @@ const state = {
   selectedSongId: null,
   searchTerm: "",
   saveStatusTimer: null,
+  activeTab: "edit",
 };
 
 const elements = {
@@ -52,6 +53,10 @@ const elements = {
   originalKey: document.querySelector("#song-key"),
   content: document.querySelector("#song-content"),
   saveStatus: document.querySelector("#save-status"),
+  editTab: document.querySelector("#edit-tab"),
+  previewTab: document.querySelector("#preview-tab"),
+  editPanel: document.querySelector("#edit-panel"),
+  previewPanel: document.querySelector("#preview-panel"),
   previewTitle: document.querySelector("#preview-title"),
   previewArtist: document.querySelector("#preview-artist"),
   previewSongKey: document.querySelector("#preview-song-key"),
@@ -87,6 +92,8 @@ function bindEvents() {
     state.searchTerm = event.target.value.trim().toLowerCase();
     renderSongList();
   });
+  elements.editTab.addEventListener("click", () => switchTab("edit"));
+  elements.previewTab.addEventListener("click", () => switchTab("preview"));
   elements.transposeUp.addEventListener("click", () => transposeSelectedSong(1));
   elements.transposeDown.addEventListener("click", () => transposeSelectedSong(-1));
   elements.resetTranspose.addEventListener("click", () => resetTranspose());
@@ -153,6 +160,7 @@ function createBlankSong() {
 
   state.songs.unshift(newSong);
   state.selectedSongId = newSong.id;
+  state.activeTab = "edit";
   saveSongs();
   render();
   fillForm(newSong);
@@ -173,6 +181,7 @@ function handleSaveSong(event) {
 
   applyFormToSong(selectedSong);
   persistSongs("Song saved");
+  state.activeTab = "preview";
   render();
 }
 
@@ -202,8 +211,22 @@ function deleteSelectedSong() {
 }
 
 function render() {
+  renderTabs();
   renderSongList();
   renderSelectedSong();
+}
+
+function renderTabs() {
+  const isEditTab = state.activeTab === "edit";
+
+  elements.editTab.classList.toggle("active", isEditTab);
+  elements.previewTab.classList.toggle("active", !isEditTab);
+  elements.editTab.setAttribute("aria-selected", String(isEditTab));
+  elements.previewTab.setAttribute("aria-selected", String(!isEditTab));
+  elements.editPanel.classList.toggle("active", isEditTab);
+  elements.previewPanel.classList.toggle("active", !isEditTab);
+  elements.editPanel.hidden = !isEditTab;
+  elements.previewPanel.hidden = isEditTab;
 }
 
 function renderSongList() {
@@ -237,8 +260,7 @@ function renderSongList() {
   elements.songList.querySelectorAll("[data-song-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedSongId = button.dataset.songId;
-      renderSelectedSong();
-      renderSongList();
+      render();
     });
   });
 }
@@ -254,7 +276,7 @@ function renderSelectedSong() {
 }
 
 function fillForm(song) {
-  elements.title.value = song.title;
+  elements.title.value = song.title === "Untitled Song" ? "" : song.title;
   elements.artist.value = song.artist;
   elements.originalKey.value = song.originalKey;
   elements.content.value = song.content;
@@ -282,7 +304,7 @@ function syncDraftPreview() {
 
   const draftSong = {
     ...selectedSong,
-    title: elements.title.value.trim(),
+    title: elements.title.value.trim() || "Untitled Song",
     artist: elements.artist.value.trim(),
     originalKey: elements.originalKey.value,
     content: normalizeLineEndings(elements.content.value),
@@ -302,6 +324,11 @@ function handleDraftChange() {
   persistSongs("Saved automatically");
   syncDraftPreview();
   renderSongList();
+}
+
+function switchTab(tab) {
+  state.activeTab = tab;
+  renderTabs();
 }
 
 function transposeSelectedSong(step) {
@@ -404,7 +431,7 @@ function transposeChordRoot(root, offset, useFlats) {
     return root;
   }
 
-  const wrappedIndex = (currentIndex + offset % 12 + 12) % 12;
+  const wrappedIndex = (currentIndex + (offset % 12) + 12) % 12;
   const sharpNote = SHARP_NOTES[wrappedIndex];
 
   if (useFlats && SHARP_TO_FLAT[sharpNote]) {

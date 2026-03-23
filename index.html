@@ -45,91 +45,116 @@
       </aside>
 
       <main class="main-content">
-        <section class="editor-card">
-          <div class="section-heading">
-            <p class="eyebrow">Song Details</p>
-            <h2>Edit Song</h2>
+        <section class="workspace-card">
+          <div class="mode-tabs" role="tablist" aria-label="Song workspace mode">
+            <button
+              id="edit-tab"
+              class="tab-button active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="edit-panel"
+            >
+              Edit
+            </button>
+            <button
+              id="preview-tab"
+              class="tab-button"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="preview-panel"
+            >
+              Preview
+            </button>
           </div>
 
-          <form id="song-form" class="song-form">
-            <label class="field">
-              <span>Song Title</span>
-              <input id="song-title" name="title" type="text" />
-            </label>
-
-            <div class="field-row">
-              <label class="field">
-                <span>Artist</span>
-                <input id="song-artist" name="artist" type="text" />
-              </label>
-
-              <label class="field">
-                <span>Original Key</span>
-                <select id="song-key" name="originalKey"></select>
-              </label>
-            </div>
-
-            <label class="field">
-              <span>Chord + lyric sheet</span>
-              <textarea
-                id="song-content"
-                name="content"
-                rows="16"
-                placeholder="Paste your song here with chords above the lyrics"
-                required
-              ></textarea>
-            </label>
-
-            <div class="form-actions">
-              <button class="primary-button" type="submit">Save Song</button>
-              <span id="save-status" class="save-status" aria-live="polite">
-                Saved
-              </span>
-              <button id="delete-song-button" class="ghost-button" type="button">
-                Delete Song
-              </button>
-            </div>
-          </form>
-        </section>
-
-        <section class="viewer-card">
-          <div class="viewer-header">
+          <section id="edit-panel" class="tab-panel active" role="tabpanel">
             <div class="section-heading">
-              <p class="eyebrow">Live Preview</p>
-              <h2 id="preview-title">Select or create a song</h2>
+              <p class="eyebrow">Song Details</p>
+              <h2>Edit Song</h2>
             </div>
 
-            <div class="transpose-panel">
-              <div class="key-badges">
-                <span class="badge">
-                  Original: <strong id="original-key-label">-</strong>
-                </span>
-                <span class="badge">
-                  Saved transpose: <strong id="saved-key-label">-</strong>
-                </span>
+            <form id="song-form" class="song-form">
+              <label class="field">
+                <span>Song Title</span>
+                <input id="song-title" name="title" type="text" />
+              </label>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>Artist</span>
+                  <input id="song-artist" name="artist" type="text" />
+                </label>
+
+                <label class="field">
+                  <span>Original Key</span>
+                  <select id="song-key" name="originalKey"></select>
+                </label>
               </div>
 
-              <div class="transpose-controls">
-                <button id="transpose-down" class="ghost-button" type="button">
-                  - Semitone
+              <label class="field">
+                <span>Chord + lyric sheet</span>
+                <textarea
+                  id="song-content"
+                  name="content"
+                  rows="16"
+                  placeholder="Paste your song here with chords above the lyrics"
+                  required
+                ></textarea>
+              </label>
+
+              <div class="form-actions">
+                <button class="primary-button" type="submit">Save Song</button>
+                <span id="save-status" class="save-status" aria-live="polite">
+                  Saved
+                </span>
+                <button id="delete-song-button" class="ghost-button" type="button">
+                  Delete Song
                 </button>
-                <span id="transpose-status" class="transpose-status">0</span>
-                <button id="transpose-up" class="ghost-button" type="button">
-                  + Semitone
-                </button>
-                <button id="reset-transpose" class="ghost-button" type="button">
-                  Reset
-                </button>
+              </div>
+            </form>
+          </section>
+
+          <section id="preview-panel" class="tab-panel" role="tabpanel" hidden>
+            <div class="viewer-header">
+              <div class="section-heading">
+                <p class="eyebrow">Live Preview</p>
+                <h2 id="preview-title">Select or create a song</h2>
+              </div>
+
+              <div class="transpose-panel">
+                <div class="key-badges">
+                  <span class="badge">
+                    Original: <strong id="original-key-label">-</strong>
+                  </span>
+                  <span class="badge">
+                    Saved transpose: <strong id="saved-key-label">-</strong>
+                  </span>
+                </div>
+
+                <div class="transpose-controls">
+                  <button id="transpose-down" class="ghost-button" type="button">
+                    - Semitone
+                  </button>
+                  <span id="transpose-status" class="transpose-status">0</span>
+                  <button id="transpose-up" class="ghost-button" type="button">
+                    + Semitone
+                  </button>
+                  <button id="reset-transpose" class="ghost-button" type="button">
+                    Reset
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="preview-meta">
-            <span id="preview-artist" class="pill subtle">Artist</span>
-            <span id="preview-song-key" class="pill subtle">Key</span>
-          </div>
+            <div class="preview-meta">
+              <span id="preview-artist" class="pill subtle">Artist</span>
+              <span id="preview-song-key" class="pill subtle">Key</span>
+            </div>
 
-          <pre id="song-preview" class="song-preview">No song selected yet.</pre>
+            <pre id="song-preview" class="song-preview">No song selected yet.</pre>
+          </section>
         </section>
       </main>
     </div>
