@@ -320,6 +320,7 @@ function renderSongList() {
   elements.songList.querySelectorAll("[data-song-id]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedSongId = button.dataset.songId;
+      state.activeTab = "preview";
       render();
     });
   });
