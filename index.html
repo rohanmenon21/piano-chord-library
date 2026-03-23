@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Piano Chord Library</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <p class="eyebrow">Chord Organizer</p>
+          <h1>Piano Chord Library</h1>
+          <p class="brand-copy">
+            Save song sheets with chords above the lyrics, then transpose them
+            higher or lower whenever you need.
+          </p>
+        </div>
+
+        <button id="new-song-button" class="primary-button" type="button">
+          New Song
+        </button>
+
+        <section class="song-list-panel">
+          <div class="song-list-header">
+            <h2>Songs</h2>
+            <span id="song-count" class="pill">0</span>
+          </div>
+          <input
+            id="song-search"
+            class="search-input"
+            type="search"
+            placeholder="Search songs"
+            aria-label="Search songs"
+          />
+          <div id="song-list" class="song-list" aria-live="polite"></div>
+        </section>
+      </aside>
+
+      <main class="main-content">
+        <section class="editor-card">
+          <div class="section-heading">
+            <p class="eyebrow">Song Details</p>
+            <h2>Edit Song</h2>
+          </div>
+
+          <form id="song-form" class="song-form">
+            <label class="field">
+              <span>Song Title</span>
+              <input id="song-title" name="title" type="text" />
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Artist</span>
+                <input id="song-artist" name="artist" type="text" />
+              </label>
+
+              <label class="field">
+                <span>Original Key</span>
+                <select id="song-key" name="originalKey"></select>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Chord + lyric sheet</span>
+              <textarea
+                id="song-content"
+                name="content"
+                rows="16"
+                placeholder="Paste your song here with chords above the lyrics"
+                required
+              ></textarea>
+            </label>
+
+            <div class="form-actions">
+              <button class="primary-button" type="submit">Save Song</button>
+              <span id="save-status" class="save-status" aria-live="polite">
+                Saved
+              </span>
+              <button id="delete-song-button" class="ghost-button" type="button">
+                Delete Song
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="viewer-card">
+          <div class="viewer-header">
+            <div class="section-heading">
+              <p class="eyebrow">Live Preview</p>
+              <h2 id="preview-title">Select or create a song</h2>
+            </div>
+
+            <div class="transpose-panel">
+              <div class="key-badges">
+                <span class="badge">
+                  Original: <strong id="original-key-label">-</strong>
+                </span>
+                <span class="badge">
+                  Saved transpose: <strong id="saved-key-label">-</strong>
+                </span>
+              </div>
+
+              <div class="transpose-controls">
+                <button id="transpose-down" class="ghost-button" type="button">
+                  - Semitone
+                </button>
+                <span id="transpose-status" class="transpose-status">0</span>
+                <button id="transpose-up" class="ghost-button" type="button">
+                  + Semitone
+                </button>
+                <button id="reset-transpose" class="ghost-button" type="button">
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="preview-meta">
+            <span id="preview-artist" class="pill subtle">Artist</span>
+            <span id="preview-song-key" class="pill subtle">Key</span>
+          </div>
+
+          <pre id="song-preview" class="song-preview">No song selected yet.</pre>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
