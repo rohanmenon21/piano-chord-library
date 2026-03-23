@@ -129,6 +129,8 @@ select {
 .preview-meta,
 .field-row,
 .form-actions,
+.import-header,
+.import-row,
 .transpose-controls,
 .key-badges {
   display: flex;
@@ -260,6 +262,36 @@ select {
   gap: 16px;
 }
 
+.import-card {
+  margin-bottom: 22px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 247, 236, 0.88);
+}
+
+.import-header {
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.import-card h3 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-size: 1.2rem;
+}
+
+.import-row {
+  align-items: center;
+}
+
+.import-status {
+  color: var(--muted);
+  font-size: 0.92rem;
+  text-align: right;
+}
+
 .field span {
   margin-bottom: 8px;
   font-weight: 500;
@@ -379,6 +411,8 @@ select {
 
   .field-row,
   .form-actions,
+  .import-row,
+  .import-header,
   .transpose-controls,
   .key-badges,
   .preview-meta {

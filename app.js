@@ -1,4 +1,8 @@
 const STORAGE_KEY = "piano-chord-library-v1";
+const IMPORT_PROXIES = [
+  (url) => url,
+  (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//, "")}`,
+];
 const KEY_OPTIONS = [
   "C",
   "C#",
@@ -47,6 +51,9 @@ const elements = {
   songSearch: document.querySelector("#song-search"),
   newSongButton: document.querySelector("#new-song-button"),
   deleteSongButton: document.querySelector("#delete-song-button"),
+  importUrl: document.querySelector("#import-url"),
+  importButton: document.querySelector("#import-button"),
+  importStatus: document.querySelector("#import-status"),
   form: document.querySelector("#song-form"),
   title: document.querySelector("#song-title"),
   artist: document.querySelector("#song-artist"),
@@ -88,6 +95,7 @@ function bindEvents() {
   elements.form.addEventListener("submit", handleSaveSong);
   elements.newSongButton.addEventListener("click", createBlankSong);
   elements.deleteSongButton.addEventListener("click", deleteSelectedSong);
+  elements.importButton.addEventListener("click", importFromUrl);
   elements.songSearch.addEventListener("input", (event) => {
     state.searchTerm = event.target.value.trim().toLowerCase();
     renderSongList();
@@ -101,6 +109,58 @@ function bindEvents() {
   ["input", "change"].forEach((eventName) => {
     elements.form.addEventListener(eventName, handleDraftChange);
   });
+}
+
+async function importFromUrl() {
+  const rawUrl = elements.importUrl.value.trim();
+  if (!rawUrl) {
+    setImportStatus("Add a URL first");
+    return;
+  }
+
+  let normalizedUrl;
+  try {
+    normalizedUrl = new URL(rawUrl).toString();
+  } catch (error) {
+    setImportStatus("That URL does not look valid");
+    return;
+  }
+
+  elements.importButton.disabled = true;
+  setImportStatus("Fetching page...");
+
+  try {
+    const html = await fetchImportHtml(normalizedUrl);
+    const extractedSong = extractSongFromHtml(html, normalizedUrl);
+
+    if (!extractedSong.content.trim()) {
+      throw new Error("No usable chord/lyric block found on that page");
+    }
+
+    const selectedSong = getSelectedSong();
+    if (!selectedSong) {
+      throw new Error("No editable song is currently selected");
+    }
+
+    selectedSong.title = extractedSong.title || selectedSong.title || "Untitled Song";
+    selectedSong.artist = extractedSong.artist || selectedSong.artist || "";
+    selectedSong.originalKey = extractedSong.originalKey || selectedSong.originalKey || "C";
+    selectedSong.savedTranspose = 0;
+    selectedSong.savedKey = selectedSong.originalKey;
+    selectedSong.content = extractedSong.content;
+    selectedSong.updatedAt = Date.now();
+
+    fillForm(selectedSong);
+    persistSongs("Imported song");
+    syncDraftPreview();
+    renderSongList();
+    setImportStatus("Imported successfully");
+  } catch (error) {
+    console.error(error);
+    setImportStatus(error.message || "Import failed");
+  } finally {
+    elements.importButton.disabled = false;
+  }
 }
 
 function populateKeySelect() {
@@ -331,6 +391,34 @@ function switchTab(tab) {
   renderTabs();
 }
 
+async function fetchImportHtml(url) {
+  let lastError = null;
+
+  for (const buildUrl of IMPORT_PROXIES) {
+    const targetUrl = buildUrl(url);
+
+    try {
+      const response = await fetch(targetUrl);
+      if (!response.ok) {
+        throw new Error(`Request failed with ${response.status}`);
+      }
+
+      const text = await response.text();
+      if (text.trim()) {
+        return text;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new Error(
+    lastError?.message?.includes("Failed to fetch")
+      ? "That site blocked browser access. Try another page or paste manually."
+      : lastError?.message || "Import failed",
+  );
+}
+
 function transposeSelectedSong(step) {
   const selectedSong = getSelectedSong();
   if (!selectedSong) {
@@ -482,6 +570,132 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function extractSongFromHtml(html, sourceUrl) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  const title = extractTitle(doc, sourceUrl);
+  const artist = extractArtist(doc);
+  const originalKey = extractKeyFromDocument(doc);
+  const content = extractSongContent(doc);
+
+  return {
+    title,
+    artist,
+    originalKey,
+    content,
+  };
+}
+
+function extractTitle(doc, sourceUrl) {
+  const titleCandidates = [
+    doc.querySelector("meta[property='og:title']")?.content,
+    doc.querySelector("h1")?.textContent,
+    doc.title,
+  ]
+    .map((value) => cleanImportedText(value || ""))
+    .filter(Boolean);
+
+  if (titleCandidates.length > 0) {
+    return titleCandidates[0]
+      .replace(/\s*\|\s*.*$/, "")
+      .replace(/\s*-\s*(lyrics|chords|tabs?).*$/i, "")
+      .trim();
+  }
+
+  try {
+    const hostname = new URL(sourceUrl).hostname.replace(/^www\./, "");
+    return hostname;
+  } catch (error) {
+    return "Imported Song";
+  }
+}
+
+function extractArtist(doc) {
+  const candidate = [
+    doc.querySelector("meta[name='author']")?.content,
+    doc.querySelector("meta[property='music:musician']")?.content,
+    doc.querySelector("[itemprop='byArtist']")?.textContent,
+  ]
+    .map((value) => cleanImportedText(value || ""))
+    .find(Boolean);
+
+  return candidate || "";
+}
+
+function extractKeyFromDocument(doc) {
+  const bodyText = cleanImportedText(doc.body?.textContent || "");
+  const match = bodyText.match(/\b(?:key|capo key|original key)\s*[:\-]?\s*([A-G](?:#|b)?m?)\b/i);
+  return match ? normalizeImportedKey(match[1]) : "C";
+}
+
+function extractSongContent(doc) {
+  const candidates = [
+    ...doc.querySelectorAll("pre, article, main, section, .lyrics, .chords, .song, .songtext, .song-body, .entry-content"),
+  ];
+
+  const scoredBlocks = candidates
+    .map((element) => {
+      const text = normalizeImportedText(element.innerText || element.textContent || "");
+      return {
+        text,
+        score: scoreImportedBlock(text),
+      };
+    })
+    .filter((entry) => entry.text && entry.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scoredBlocks.length > 0) {
+    return scoredBlocks[0].text;
+  }
+
+  const wholePageText = normalizeImportedText(doc.body?.innerText || doc.body?.textContent || "");
+  if (scoreImportedBlock(wholePageText) > 0) {
+    return wholePageText;
+  }
+
+  return "";
+}
+
+function scoreImportedBlock(text) {
+  if (!text) {
+    return 0;
+  }
+
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) {
+    return 0;
+  }
+
+  const chordLines = lines.filter((line) => isChordLine(line)).length;
+  const bracketChords = (text.match(/\[[A-G][^\]]*\]/g) || []).length;
+  const lyricLines = lines.filter((line) => /[a-z]{3,}/i.test(line) && !isChordLine(line)).length;
+
+  return chordLines * 4 + bracketChords * 2 + lyricLines;
+}
+
+function normalizeImportedText(value) {
+  return normalizeLineEndings(
+    cleanImportedText(value)
+      .replace(/\u00a0/g, " ")
+      .replace(/\n{3,}/g, "\n\n"),
+  ).trim();
+}
+
+function cleanImportedText(value) {
+  return value.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").trim();
+}
+
+function normalizeImportedKey(value) {
+  const cleaned = value.trim();
+  const base = cleaned.match(/^([A-G](?:#|b)?)/)?.[1] || "C";
+  return KEY_OPTIONS.includes(base) ? base : FLAT_TO_SHARP[base] || "C";
+}
+
+function setImportStatus(message) {
+  elements.importStatus.textContent = message;
 }
 
 function applyFormToSong(song) {

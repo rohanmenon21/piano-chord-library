@@ -75,6 +75,30 @@
               <h2>Edit Song</h2>
             </div>
 
+            <section class="import-card">
+              <div class="import-header">
+                <div>
+                  <p class="eyebrow">Quick Import</p>
+                  <h3>Import From URL</h3>
+                </div>
+                <span id="import-status" class="import-status" aria-live="polite">
+                  Paste a song page link
+                </span>
+              </div>
+
+              <div class="import-row">
+                <input
+                  id="import-url"
+                  class="search-input"
+                  type="url"
+                  placeholder="https://example.com/song-page"
+                />
+                <button id="import-button" class="ghost-button" type="button">
+                  Import
+                </button>
+              </div>
+            </section>
+
             <form id="song-form" class="song-form">
               <label class="field">
                 <span>Song Title</span>
