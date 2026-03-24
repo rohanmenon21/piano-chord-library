@@ -36,6 +36,15 @@ const SHARP_TO_FLAT = {
   "G#": "Ab",
   "A#": "Bb",
 };
+const PITCH_CLASS_TO_DISPLAY = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+const WHITE_PIANO_KEYS = ["C", "D", "E", "F", "G", "A", "B"];
+const BLACK_PIANO_KEYS = [
+  { note: "C#", left: "10.4%" },
+  { note: "D#", left: "25.1%" },
+  { note: "F#", left: "53.8%" },
+  { note: "G#", left: "68.4%" },
+  { note: "A#", left: "82.8%" },
+];
 
 const state = {
   songs: loadSongs(),
@@ -43,6 +52,7 @@ const state = {
   searchTerm: "",
   saveStatusTimer: null,
   activeTab: "edit",
+  hoveredChord: null,
 };
 
 const elements = {
@@ -71,6 +81,10 @@ const elements = {
   savedKeyLabel: document.querySelector("#saved-key-label"),
   transposeStatus: document.querySelector("#transpose-status"),
   preview: document.querySelector("#song-preview"),
+  chordTooltip: document.querySelector("#chord-tooltip"),
+  tooltipChordName: document.querySelector("#tooltip-chord-name"),
+  tooltipChordNotes: document.querySelector("#tooltip-chord-notes"),
+  tooltipPiano: document.querySelector("#tooltip-piano"),
   transposeUp: document.querySelector("#transpose-up"),
   transposeDown: document.querySelector("#transpose-down"),
   resetTranspose: document.querySelector("#reset-transpose"),
@@ -105,6 +119,9 @@ function bindEvents() {
   elements.transposeUp.addEventListener("click", () => transposeSelectedSong(1));
   elements.transposeDown.addEventListener("click", () => transposeSelectedSong(-1));
   elements.resetTranspose.addEventListener("click", () => resetTranspose());
+  elements.preview.addEventListener("mouseover", handlePreviewMouseOver);
+  elements.preview.addEventListener("mousemove", handlePreviewMouseMove);
+  elements.preview.addEventListener("mouseleave", hideChordTooltip);
 
   ["input", "change"].forEach((eventName) => {
     elements.form.addEventListener(eventName, handleDraftChange);
@@ -354,7 +371,13 @@ function updatePreview(song) {
   elements.transposeStatus.textContent = formatTranspose(song.savedTranspose);
 
   const transposedContent = transposeSheet(song.content, song.savedTranspose);
-  elements.preview.textContent = transposedContent || "Paste lyrics and chords to preview them here.";
+  if (!transposedContent) {
+    elements.preview.textContent = "Paste lyrics and chords to preview them here.";
+    hideChordTooltip();
+    return;
+  }
+
+  elements.preview.innerHTML = renderPreviewMarkup(transposedContent);
 }
 
 function syncDraftPreview() {
@@ -390,6 +413,39 @@ function handleDraftChange() {
 function switchTab(tab) {
   state.activeTab = tab;
   renderTabs();
+  if (tab !== "preview") {
+    hideChordTooltip();
+  }
+}
+
+function handlePreviewMouseOver(event) {
+  const chordElement = event.target.closest(".chord-token");
+  if (!chordElement) {
+    hideChordTooltip();
+    return;
+  }
+
+  const chordName = chordElement.dataset.chord;
+  if (!chordName) {
+    hideChordTooltip();
+    return;
+  }
+
+  const chordShape = getChordShape(chordName);
+  if (!chordShape) {
+    hideChordTooltip();
+    return;
+  }
+
+  state.hoveredChord = chordName;
+  showChordTooltip(chordName, chordShape, chordElement);
+}
+
+function handlePreviewMouseMove(event) {
+  const chordElement = event.target.closest(".chord-token");
+  if (!chordElement && state.hoveredChord) {
+    hideChordTooltip();
+  }
 }
 
 async function fetchImportHtml(url) {
@@ -497,6 +553,57 @@ function transposeLine(line, offset) {
   });
 }
 
+function renderPreviewMarkup(content) {
+  return content
+    .split("\n")
+    .map((line) => renderPreviewLine(line))
+    .join("\n");
+}
+
+function renderPreviewLine(line) {
+  if (!line) {
+    return "";
+  }
+
+  const hasBracketChords = /\[[^\]]+\]/.test(line);
+  if (hasBracketChords) {
+    return replaceMatchesWithEscaping(line, /\[([^\]]+)\]/g, (match, chord) => {
+      return `[${renderChordToken(chord)}]`;
+    });
+  }
+
+  if (!isChordLine(line)) {
+    return escapeHtmlPreservingSpaces(line);
+  }
+
+  return replaceMatchesWithEscaping(
+    line,
+    /([A-G](?:#|b)?[^\s|]*?(?:\/[A-G](?:#|b)?)?)(?=\s|$|\|)/g,
+    (match) => {
+      return looksLikeChord(match) ? renderChordToken(match) : escapeHtmlPreservingSpaces(match);
+    },
+  );
+}
+
+function replaceMatchesWithEscaping(line, pattern, renderMatch) {
+  let result = "";
+  let lastIndex = 0;
+
+  line.replace(pattern, (...args) => {
+    const match = args[0];
+    const groups = args.slice(1, -2);
+    const offset = args.at(-2);
+
+    result += escapeHtmlPreservingSpaces(line.slice(lastIndex, offset));
+    result += renderMatch(match, ...groups);
+    lastIndex = offset + match.length;
+    return match;
+  });
+
+  result += escapeHtmlPreservingSpaces(line.slice(lastIndex));
+  return result;
+}
+
 function transposeChord(chord, offset) {
   const trimmed = chord.trim();
   const match = trimmed.match(/^([A-G](?:#|b)?)(.*?)(?:\/([A-G](?:#|b)?))?$/);
@@ -571,6 +678,15 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapeHtmlPreservingSpaces(value) {
+  return escapeHtml(value).replace(/ /g, "&nbsp;");
+}
+
+function renderChordToken(chord) {
+  const safeChord = escapeHtml(chord);
+  return `<span class="chord-token" data-chord="${safeChord}">${safeChord}</span>`;
 }
 
 function extractSongFromHtml(html, sourceUrl) {
@@ -731,4 +847,103 @@ function createSongId() {
   }
 
   return `song-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function showChordTooltip(chordName, chordShape, chordElement) {
+  elements.tooltipChordName.textContent = chordName;
+  elements.tooltipChordNotes.textContent = chordShape.noteNames.join(" ");
+  elements.tooltipPiano.innerHTML = renderPianoKeyboard(chordShape.noteNames);
+  chordElement.appendChild(elements.chordTooltip);
+  elements.chordTooltip.hidden = false;
+}
+
+function hideChordTooltip() {
+  state.hoveredChord = null;
+  elements.chordTooltip.hidden = true;
+  elements.previewPanel.appendChild(elements.chordTooltip);
+}
+
+function renderPianoKeyboard(noteNames) {
+  const activeSet = new Set(noteNames.map((note) => canonicalizeNoteName(note)));
+  const whiteKeysMarkup = WHITE_PIANO_KEYS.map((note) => {
+    const isActive = activeSet.has(note);
+    return `<div class="piano-key white ${isActive ? "active" : ""}">${note}</div>`;
+  }).join("");
+
+  const blackKeysMarkup = BLACK_PIANO_KEYS.map(({ note, left }) => {
+    const isActive = activeSet.has(note);
+    return `<div class="piano-key black ${isActive ? "active" : ""}" style="left: ${left}">${note}</div>`;
+  }).join("");
+
+  return `
+    <div class="piano-keyboard">
+      <div class="piano-white-keys">${whiteKeysMarkup}</div>
+      <div class="piano-black-keys">${blackKeysMarkup}</div>
+    </div>
+  `;
+}
+
+function getChordShape(chord) {
+  const trimmed = chord.trim();
+  const match = trimmed.match(/^([A-G](?:#|b)?)([^/]*)?(?:\/([A-G](?:#|b)?))?$/);
+  if (!match) {
+    return null;
+  }
+
+  const [, root, rawSuffix = "", bass] = match;
+  const normalizedRoot = FLAT_TO_SHARP[root] || root;
+  const rootIndex = SHARP_NOTES.indexOf(normalizedRoot);
+  if (rootIndex === -1) {
+    return null;
+  }
+
+  const suffix = rawSuffix.toLowerCase();
+  let intervals = [0, 4, 7];
+
+  if (suffix.includes("sus2")) {
+    intervals = [0, 2, 7];
+  } else if (suffix.includes("sus4") || suffix.includes("sus")) {
+    intervals = [0, 5, 7];
+  } else if (suffix.includes("dim7")) {
+    intervals = [0, 3, 6, 9];
+  } else if (suffix.includes("dim") || suffix.includes("m7b5")) {
+    intervals = [0, 3, 6];
+  } else if (suffix.includes("aug") || suffix.includes("+")) {
+    intervals = [0, 4, 8];
+  } else if (suffix.includes("maj7")) {
+    intervals = [0, 4, 7, 11];
+  } else if (suffix.includes("m7")) {
+    intervals = [0, 3, 7, 10];
+  } else if (suffix === "m" || suffix.startsWith("m") || suffix.includes("min")) {
+    intervals = [0, 3, 7];
+  } else if (suffix.includes("7")) {
+    intervals = [0, 4, 7, 10];
+  }
+
+  if (suffix.includes("6")) {
+    intervals = [...intervals, 9];
+  }
+  if (suffix.includes("add9")) {
+    intervals = [...intervals, 2];
+  }
+  if (suffix.includes("9")) {
+    intervals = [...intervals, 2];
+  }
+
+  const pitchClasses = [...new Set(intervals.map((interval) => (rootIndex + interval) % 12))];
+
+  if (bass) {
+    const bassIndex = SHARP_NOTES.indexOf(FLAT_TO_SHARP[bass] || bass);
+    if (bassIndex !== -1 && !pitchClasses.includes(bassIndex)) {
+      pitchClasses.unshift(bassIndex);
+    }
+  }
+
+  return {
+    noteNames: pitchClasses.map((index) => PITCH_CLASS_TO_DISPLAY[index]),
+  };
+}
+
+function canonicalizeNoteName(note) {
+  return SHARP_TO_FLAT[note] ? note : FLAT_TO_SHARP[note] || note;
 }
