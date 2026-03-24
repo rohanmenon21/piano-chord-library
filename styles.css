@@ -415,6 +415,32 @@ select {
   line-height: 1.2;
 }
 
+.undo-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(42, 28, 16, 0.96);
+  color: #f9e8d6;
+  border: 1px solid rgba(255, 209, 159, 0.16);
+  box-shadow: 0 20px 50px rgba(20, 11, 5, 0.32);
+}
+
+.undo-toast[hidden],
+.chord-tooltip[hidden] {
+  display: none;
+}
+
+.undo-button {
+  min-height: 40px;
+  padding: 0.65rem 1rem;
+}
+
 .tooltip-header {
   display: flex;
   align-items: baseline;
@@ -537,6 +563,13 @@ select {
 
   .mode-tabs {
     display: flex;
+  }
+
+  .undo-toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    justify-content: space-between;
   }
 
   .tab-button,

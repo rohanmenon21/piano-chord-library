@@ -1,4 +1,6 @@
 const STORAGE_KEY = "piano-chord-library-v1";
+const PENDING_DELETE_KEY = "piano-chord-library-pending-delete-v1";
+const UNDO_WINDOW_MS = 5000;
 const IMPORT_PROXIES = [
   (url) => url,
   (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//, "")}`,
@@ -53,6 +55,8 @@ const state = {
   saveStatusTimer: null,
   activeTab: "edit",
   hoveredChord: null,
+  pendingDelete: loadPendingDelete(),
+  undoTimer: null,
 };
 
 const elements = {
@@ -61,6 +65,9 @@ const elements = {
   songSearch: document.querySelector("#song-search"),
   newSongButton: document.querySelector("#new-song-button"),
   deleteSongButton: document.querySelector("#delete-song-button"),
+  undoToast: document.querySelector("#undo-toast"),
+  undoMessage: document.querySelector("#undo-message"),
+  undoButton: document.querySelector("#undo-button"),
   importUrl: document.querySelector("#import-url"),
   importButton: document.querySelector("#import-button"),
   importStatus: document.querySelector("#import-status"),
@@ -94,6 +101,7 @@ initialize();
 
 function initialize() {
   populateKeySelect();
+  reconcilePendingDelete();
 
   if (state.songs.length > 0) {
     state.selectedSongId = state.songs[0].id;
@@ -109,6 +117,7 @@ function bindEvents() {
   elements.form.addEventListener("submit", handleSaveSong);
   elements.newSongButton.addEventListener("click", createBlankSong);
   elements.deleteSongButton.addEventListener("click", deleteSelectedSong);
+  elements.undoButton.addEventListener("click", undoDelete);
   elements.importButton.addEventListener("click", importFromUrl);
   elements.songSearch.addEventListener("input", (event) => {
     state.searchTerm = event.target.value.trim().toLowerCase();
@@ -219,8 +228,47 @@ function loadSongs() {
   }
 }
 
+function loadPendingDelete() {
+  try {
+    const raw = localStorage.getItem(PENDING_DELETE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.song || !parsed?.expiresAt) {
+      return null;
+    }
+
+    if (parsed.expiresAt <= Date.now()) {
+      localStorage.removeItem(PENDING_DELETE_KEY);
+      return null;
+    }
+
+    return {
+      ...parsed,
+      song: {
+        ...parsed.song,
+        content: normalizeLineEndings(parsed.song.content || ""),
+      },
+    };
+  } catch (error) {
+    console.error("Unable to load pending delete", error);
+    return null;
+  }
+}
+
 function saveSongs() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.songs));
+}
+
+function savePendingDelete() {
+  if (!state.pendingDelete) {
+    localStorage.removeItem(PENDING_DELETE_KEY);
+    return;
+  }
+
+  localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(state.pendingDelete));
 }
 
 function createBlankSong() {
@@ -275,10 +323,22 @@ function deleteSelectedSong() {
     return;
   }
 
+  finalizePendingDelete();
+
+  const songIndex = state.songs.findIndex((song) => song.id === selectedSong.id);
+  state.pendingDelete = {
+    song: { ...selectedSong },
+    originalIndex: songIndex,
+    expiresAt: Date.now() + UNDO_WINDOW_MS,
+  };
+  savePendingDelete();
+  schedulePendingDeleteExpiry();
+
   state.songs = state.songs.filter((song) => song.id !== selectedSong.id);
 
   if (state.songs.length === 0) {
     createBlankSong();
+    renderUndoToast();
     return;
   }
 
@@ -291,6 +351,7 @@ function render() {
   renderTabs();
   renderSongList();
   renderSelectedSong();
+  renderUndoToast();
 }
 
 function renderTabs() {
@@ -351,6 +412,17 @@ function renderSelectedSong() {
 
   fillForm(selectedSong);
   updatePreview(selectedSong);
+}
+
+function renderUndoToast() {
+  if (!state.pendingDelete) {
+    elements.undoToast.hidden = true;
+    return;
+  }
+
+  const songTitle = state.pendingDelete.song.title || "Untitled Song";
+  elements.undoMessage.textContent = `"${songTitle}" deleted`;
+  elements.undoToast.hidden = false;
 }
 
 function fillForm(song) {
@@ -861,6 +933,68 @@ function hideChordTooltip() {
   state.hoveredChord = null;
   elements.chordTooltip.hidden = true;
   elements.previewPanel.appendChild(elements.chordTooltip);
+}
+
+function undoDelete() {
+  if (!state.pendingDelete) {
+    return;
+  }
+
+  const { song, originalIndex } = state.pendingDelete;
+  const insertAt = Math.max(0, Math.min(originalIndex ?? 0, state.songs.length));
+  state.songs.splice(insertAt, 0, song);
+  state.selectedSongId = song.id;
+  state.activeTab = "preview";
+  saveSongs();
+  clearPendingDelete();
+  render();
+}
+
+function reconcilePendingDelete() {
+  if (!state.pendingDelete) {
+    return;
+  }
+
+  schedulePendingDeleteExpiry();
+}
+
+function schedulePendingDeleteExpiry() {
+  if (state.undoTimer) {
+    window.clearTimeout(state.undoTimer);
+  }
+
+  if (!state.pendingDelete) {
+    return;
+  }
+
+  const remainingMs = state.pendingDelete.expiresAt - Date.now();
+  if (remainingMs <= 0) {
+    finalizePendingDelete();
+    return;
+  }
+
+  state.undoTimer = window.setTimeout(() => {
+    finalizePendingDelete();
+    renderUndoToast();
+  }, remainingMs);
+}
+
+function clearPendingDelete() {
+  if (state.undoTimer) {
+    window.clearTimeout(state.undoTimer);
+    state.undoTimer = null;
+  }
+
+  state.pendingDelete = null;
+  savePendingDelete();
+}
+
+function finalizePendingDelete() {
+  if (!state.pendingDelete) {
+    return;
+  }
+
+  clearPendingDelete();
 }
 
 function renderPianoKeyboard(noteNames) {
