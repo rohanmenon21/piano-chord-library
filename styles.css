@@ -397,9 +397,7 @@ select {
 }
 
 .chord-tooltip {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
+  position: fixed;
   z-index: 20;
   min-width: 220px;
   max-width: 280px;
@@ -410,9 +408,29 @@ select {
   border: 1px solid rgba(255, 209, 159, 0.16);
   box-shadow: 0 20px 50px rgba(20, 11, 5, 0.32);
   pointer-events: none;
-  transform: translateX(-50%);
   white-space: normal;
   line-height: 1.2;
+}
+
+.chord-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  background: rgba(42, 28, 16, 0.96);
+  border-right: 1px solid rgba(255, 209, 159, 0.16);
+  border-bottom: 1px solid rgba(255, 209, 159, 0.16);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.chord-tooltip[data-placement="top"]::after {
+  bottom: -8px;
+}
+
+.chord-tooltip[data-placement="bottom"]::after {
+  top: -8px;
+  transform: translateX(-50%) rotate(225deg);
 }
 
 .undo-toast {

@@ -55,6 +55,7 @@ const state = {
   saveStatusTimer: null,
   activeTab: "edit",
   hoveredChord: null,
+  hoveredChordElement: null,
   pendingDelete: loadPendingDelete(),
   undoTimer: null,
 };
@@ -132,6 +133,8 @@ function bindEvents() {
   elements.preview.addEventListener("mouseover", handlePreviewMouseOver);
   elements.preview.addEventListener("mousemove", handlePreviewMouseMove);
   elements.preview.addEventListener("mouseleave", hideChordTooltip);
+  window.addEventListener("resize", repositionVisibleChordTooltip);
+  window.addEventListener("scroll", repositionVisibleChordTooltip, true);
 
   ["input", "change"].forEach((eventName) => {
     elements.form.addEventListener(eventName, handleDraftChange);
@@ -511,6 +514,7 @@ function handlePreviewMouseOver(event) {
   }
 
   state.hoveredChord = chordName;
+  state.hoveredChordElement = chordElement;
   showChordTooltip(chordName, chordShape, chordElement);
 }
 
@@ -518,6 +522,12 @@ function handlePreviewMouseMove(event) {
   const chordElement = event.target.closest(".chord-token");
   if (!chordElement && state.hoveredChord) {
     hideChordTooltip();
+    return;
+  }
+
+  if (chordElement && chordElement !== state.hoveredChordElement) {
+    state.hoveredChordElement = chordElement;
+    repositionVisibleChordTooltip();
   }
 }
 
@@ -926,14 +936,66 @@ function showChordTooltip(chordName, chordShape, chordElement) {
   elements.tooltipChordName.textContent = chordName;
   elements.tooltipChordNotes.textContent = chordShape.noteNames.join(" ");
   elements.tooltipPiano.innerHTML = renderPianoKeyboard(chordShape.noteNames);
-  chordElement.appendChild(elements.chordTooltip);
+  document.body.appendChild(elements.chordTooltip);
+  elements.chordTooltip.dataset.placement = "top";
   elements.chordTooltip.hidden = false;
+  state.hoveredChordElement = chordElement;
+  repositionVisibleChordTooltip();
 }
 
 function hideChordTooltip() {
   state.hoveredChord = null;
+  state.hoveredChordElement = null;
   elements.chordTooltip.hidden = true;
+  elements.chordTooltip.removeAttribute("data-placement");
   elements.previewPanel.appendChild(elements.chordTooltip);
+}
+
+function repositionVisibleChordTooltip() {
+  if (elements.chordTooltip.hidden || !state.hoveredChordElement) {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    if (elements.chordTooltip.hidden || !state.hoveredChordElement) {
+      return;
+    }
+
+    const margin = 12;
+    const gap = 10;
+    const chordRect = state.hoveredChordElement.getBoundingClientRect();
+    const tooltipRect = elements.chordTooltip.getBoundingClientRect();
+
+    let left = chordRect.left + chordRect.width / 2 - tooltipRect.width / 2;
+    left = Math.min(
+      Math.max(margin, left),
+      window.innerWidth - tooltipRect.width - margin,
+    );
+
+    const topPlacementTop = chordRect.top - tooltipRect.height - gap;
+    const bottomPlacementTop = chordRect.bottom + gap;
+    const fitsAbove = topPlacementTop >= margin;
+    const fitsBelow = bottomPlacementTop + tooltipRect.height <= window.innerHeight - margin;
+
+    let placement = "top";
+    let top = topPlacementTop;
+
+    if (!fitsAbove && fitsBelow) {
+      placement = "bottom";
+      top = bottomPlacementTop;
+    } else if (!fitsAbove && !fitsBelow) {
+      const spaceAbove = chordRect.top - margin;
+      const spaceBelow = window.innerHeight - chordRect.bottom - margin;
+      placement = spaceBelow > spaceAbove ? "bottom" : "top";
+      top = placement === "bottom"
+        ? Math.min(bottomPlacementTop, window.innerHeight - tooltipRect.height - margin)
+        : Math.max(margin, topPlacementTop);
+    }
+
+    elements.chordTooltip.dataset.placement = placement;
+    elements.chordTooltip.style.left = `${left}px`;
+    elements.chordTooltip.style.top = `${Math.max(margin, top)}px`;
+  });
 }
 
 function undoDelete() {
