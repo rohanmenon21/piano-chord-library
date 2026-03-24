@@ -105,6 +105,7 @@ function initialize() {
 
   if (state.songs.length > 0) {
     state.selectedSongId = state.songs[0].id;
+    state.activeTab = "preview";
   } else {
     createBlankSong();
   }
