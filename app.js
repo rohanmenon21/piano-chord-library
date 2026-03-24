@@ -47,6 +47,21 @@ const BLACK_PIANO_KEYS = [
   { note: "G#", left: "68.4%" },
   { note: "A#", left: "82.8%" },
 ];
+const NON_CHORD_LABELS = new Set([
+  "intro",
+  "verse",
+  "chorus",
+  "chorous",
+  "bridge",
+  "outro",
+  "prechorus",
+  "pre-chorus",
+  "refrain",
+  "tag",
+  "solo",
+  "instrumental",
+  "ending",
+]);
 
 const state = {
   songs: loadSongs(),
@@ -619,7 +634,9 @@ function transposeLine(line, offset) {
   const hasBracketChords = /\[[^\]]+\]/.test(line);
   if (hasBracketChords) {
     return line.replace(/\[([^\]]+)\]/g, (_, bracketChord) => {
-      return `[${transposeChord(bracketChord, offset)}]`;
+      return looksLikeChord(bracketChord)
+        ? `[${transposeChord(bracketChord, offset)}]`
+        : `[${bracketChord}]`;
     });
   }
 
@@ -651,7 +668,9 @@ function renderPreviewLine(line) {
   const hasBracketChords = /\[[^\]]+\]/.test(line);
   if (hasBracketChords) {
     return replaceMatchesWithEscaping(line, /\[([^\]]+)\]/g, (match, chord) => {
-      return `[${renderChordToken(chord)}]`;
+      return looksLikeChord(chord)
+        ? `[${renderChordToken(chord)}]`
+        : escapeHtmlPreservingSpaces(match);
     });
   }
 
@@ -733,15 +752,25 @@ function looksLikeChord(token) {
     return false;
   }
 
-  if (!/^[A-G]/.test(token)) {
+  const trimmed = token.trim();
+  if (!/^[A-G]/.test(trimmed)) {
     return false;
   }
 
-  if (token.length === 1 || /^[A-G](?:#|b)?(?:m|maj|min|sus|dim|aug|add|\d|\/|°|\+|-)*.*$/i.test(token)) {
+  const normalized = trimmed.toLowerCase();
+  if (NON_CHORD_LABELS.has(normalized)) {
+    return false;
+  }
+
+  if (/^[A-G](?:#|b)?$/.test(trimmed)) {
     return true;
   }
 
-  return false;
+  if (/^[A-G](?:#|b)?(?:m|maj|min|sus|dim|aug|add|\d|\/|°|\+|-)+[A-Za-z0-9#b/°+\-]*$/i.test(trimmed)) {
+    return true;
+  }
+
+  return /^[A-G](?:#|b)?(?:maj|min|sus|dim|aug|add)\d*$/i.test(trimmed);
 }
 
 function isChordLine(line) {
@@ -870,7 +899,9 @@ function scoreImportedBlock(text) {
   }
 
   const chordLines = lines.filter((line) => isChordLine(line)).length;
-  const bracketChords = (text.match(/\[[A-G][^\]]*\]/g) || []).length;
+  const bracketChords = (text.match(/\[([^\]]+)\]/g) || []).filter((match) => {
+    return looksLikeChord(match.slice(1, -1));
+  }).length;
   const lyricLines = lines.filter((line) => /[a-z]{3,}/i.test(line) && !isChordLine(line)).length;
 
   return chordLines * 4 + bracketChords * 2 + lyricLines;
