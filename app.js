@@ -1,5 +1,6 @@
 const STORAGE_KEY = "piano-chord-library-v1";
 const PENDING_DELETE_KEY = "piano-chord-library-pending-delete-v1";
+const CHORD_VOICING_KEY = "piano-chord-library-chord-voicings-v1";
 const UNDO_WINDOW_MS = 5000;
 const IMPORT_PROXIES = [
   (url) => url,
@@ -41,11 +42,33 @@ const SHARP_TO_FLAT = {
 const PITCH_CLASS_TO_DISPLAY = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const WHITE_PIANO_KEYS = ["C", "D", "E", "F", "G", "A", "B"];
 const BLACK_PIANO_KEYS = [
-  { note: "C#", left: "10.4%" },
-  { note: "D#", left: "25.1%" },
-  { note: "F#", left: "53.8%" },
-  { note: "G#", left: "68.4%" },
-  { note: "A#", left: "82.8%" },
+  { note: "C#", midi: 49, left: "5.6%" },
+  { note: "D#", midi: 51, left: "12.1%" },
+  { note: "F#", midi: 54, left: "24.7%" },
+  { note: "G#", midi: 56, left: "31.1%" },
+  { note: "A#", midi: 58, left: "37.6%" },
+  { note: "C#", midi: 61, left: "50.1%" },
+  { note: "D#", midi: 63, left: "56.6%" },
+  { note: "F#", midi: 66, left: "69.1%" },
+  { note: "G#", midi: 68, left: "75.6%" },
+  { note: "A#", midi: 70, left: "82.1%" },
+];
+const WHITE_PIANO_KEYS_EXTENDED = [
+  { note: "C", midi: 48 },
+  { note: "D", midi: 50 },
+  { note: "E", midi: 52 },
+  { note: "F", midi: 53 },
+  { note: "G", midi: 55 },
+  { note: "A", midi: 57 },
+  { note: "B", midi: 59 },
+  { note: "C", midi: 60 },
+  { note: "D", midi: 62 },
+  { note: "E", midi: 64 },
+  { note: "F", midi: 65 },
+  { note: "G", midi: 67 },
+  { note: "A", midi: 69 },
+  { note: "B", midi: 71 },
+  { note: "C", midi: 72 },
 ];
 const NON_CHORD_LABELS = new Set([
   "intro",
@@ -71,7 +94,13 @@ const state = {
   activeTab: "edit",
   hoveredChord: null,
   hoveredChordElement: null,
+  hoveredChordVoicings: [],
+  hoveredVoicingIndex: 0,
+  hoveredSongId: null,
+  isTooltipHovered: false,
+  tooltipHideTimer: null,
   pendingDelete: loadPendingDelete(),
+  chordVoicingSelections: loadChordVoicingSelections(),
   undoTimer: null,
 };
 
@@ -107,6 +136,9 @@ const elements = {
   chordTooltip: document.querySelector("#chord-tooltip"),
   tooltipChordName: document.querySelector("#tooltip-chord-name"),
   tooltipChordNotes: document.querySelector("#tooltip-chord-notes"),
+  tooltipPrev: document.querySelector("#tooltip-prev"),
+  tooltipNext: document.querySelector("#tooltip-next"),
+  tooltipVoicingIndex: document.querySelector("#tooltip-voicing-index"),
   tooltipPiano: document.querySelector("#tooltip-piano"),
   transposeUp: document.querySelector("#transpose-up"),
   transposeDown: document.querySelector("#transpose-down"),
@@ -147,7 +179,11 @@ function bindEvents() {
   elements.resetTranspose.addEventListener("click", () => resetTranspose());
   elements.preview.addEventListener("mouseover", handlePreviewMouseOver);
   elements.preview.addEventListener("mousemove", handlePreviewMouseMove);
-  elements.preview.addEventListener("mouseleave", hideChordTooltip);
+  elements.preview.addEventListener("mouseleave", scheduleHideChordTooltip);
+  elements.chordTooltip.addEventListener("mouseenter", handleTooltipMouseEnter);
+  elements.chordTooltip.addEventListener("mouseleave", handleTooltipMouseLeave);
+  elements.tooltipPrev.addEventListener("click", () => changeTooltipVoicing(-1));
+  elements.tooltipNext.addEventListener("click", () => changeTooltipVoicing(1));
   window.addEventListener("resize", repositionVisibleChordTooltip);
   window.addEventListener("scroll", repositionVisibleChordTooltip, true);
 
@@ -277,6 +313,21 @@ function loadPendingDelete() {
   }
 }
 
+function loadChordVoicingSelections() {
+  try {
+    const raw = localStorage.getItem(CHORD_VOICING_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (error) {
+    console.error("Unable to load chord voicing selections", error);
+    return {};
+  }
+}
+
 function saveSongs() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.songs));
 }
@@ -288,6 +339,13 @@ function savePendingDelete() {
   }
 
   localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(state.pendingDelete));
+}
+
+function saveChordVoicingSelections() {
+  localStorage.setItem(
+    CHORD_VOICING_KEY,
+    JSON.stringify(state.chordVoicingSelections),
+  );
 }
 
 function createBlankSong() {
@@ -512,36 +570,50 @@ function switchTab(tab) {
 function handlePreviewMouseOver(event) {
   const chordElement = event.target.closest(".chord-token");
   if (!chordElement) {
-    hideChordTooltip();
+    if (!state.isTooltipHovered) {
+      scheduleHideChordTooltip();
+    }
     return;
   }
 
+  cancelHideChordTooltip();
   const chordName = chordElement.dataset.chord;
   if (!chordName) {
     hideChordTooltip();
     return;
   }
 
-  const chordShape = getChordShape(chordName);
-  if (!chordShape) {
+  const chordVoicings = getChordVoicings(chordName);
+  if (chordVoicings.length === 0) {
     hideChordTooltip();
     return;
   }
 
   state.hoveredChord = chordName;
   state.hoveredChordElement = chordElement;
-  showChordTooltip(chordName, chordShape, chordElement);
+  state.hoveredChordVoicings = chordVoicings;
+  state.hoveredSongId = getSelectedSong()?.id || null;
+  state.hoveredVoicingIndex = getSavedVoicingIndex(
+    state.hoveredSongId,
+    chordName,
+    chordVoicings.length,
+  );
+  showChordTooltip(chordName, chordVoicings, chordElement);
 }
 
 function handlePreviewMouseMove(event) {
   const chordElement = event.target.closest(".chord-token");
-  if (!chordElement && state.hoveredChord) {
-    hideChordTooltip();
+  if (!chordElement && state.hoveredChord && !state.isTooltipHovered) {
+    scheduleHideChordTooltip();
     return;
   }
 
   if (chordElement && chordElement !== state.hoveredChordElement) {
+    cancelHideChordTooltip();
     state.hoveredChordElement = chordElement;
+  }
+
+  if (chordElement) {
     repositionVisibleChordTooltip();
   }
 }
@@ -963,23 +1035,84 @@ function createSongId() {
   return `song-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function showChordTooltip(chordName, chordShape, chordElement) {
+function showChordTooltip(chordName, chordVoicings, chordElement) {
   elements.tooltipChordName.textContent = chordName;
-  elements.tooltipChordNotes.textContent = chordShape.noteNames.join(" ");
-  elements.tooltipPiano.innerHTML = renderPianoKeyboard(chordShape.noteNames);
+  state.hoveredChordVoicings = chordVoicings;
   document.body.appendChild(elements.chordTooltip);
   elements.chordTooltip.dataset.placement = "top";
   elements.chordTooltip.hidden = false;
   state.hoveredChordElement = chordElement;
+  renderTooltipVoicing();
   repositionVisibleChordTooltip();
 }
 
 function hideChordTooltip() {
+  cancelHideChordTooltip();
   state.hoveredChord = null;
   state.hoveredChordElement = null;
+  state.hoveredChordVoicings = [];
+  state.hoveredVoicingIndex = 0;
+  state.hoveredSongId = null;
+  state.isTooltipHovered = false;
   elements.chordTooltip.hidden = true;
   elements.chordTooltip.removeAttribute("data-placement");
   elements.previewPanel.appendChild(elements.chordTooltip);
+}
+
+function scheduleHideChordTooltip() {
+  cancelHideChordTooltip();
+  state.tooltipHideTimer = window.setTimeout(() => {
+    if (!state.isTooltipHovered) {
+      hideChordTooltip();
+    }
+  }, 120);
+}
+
+function cancelHideChordTooltip() {
+  if (state.tooltipHideTimer) {
+    window.clearTimeout(state.tooltipHideTimer);
+    state.tooltipHideTimer = null;
+  }
+}
+
+function handleTooltipMouseEnter() {
+  state.isTooltipHovered = true;
+  cancelHideChordTooltip();
+}
+
+function handleTooltipMouseLeave() {
+  state.isTooltipHovered = false;
+  scheduleHideChordTooltip();
+}
+
+function changeTooltipVoicing(direction) {
+  if (state.hoveredChordVoicings.length === 0) {
+    return;
+  }
+
+  const nextIndex = state.hoveredVoicingIndex + direction;
+  if (nextIndex < 0 || nextIndex >= state.hoveredChordVoicings.length) {
+    return;
+  }
+
+  state.hoveredVoicingIndex = nextIndex;
+  saveVoicingSelection(state.hoveredSongId, state.hoveredChord, nextIndex);
+  renderTooltipVoicing();
+  repositionVisibleChordTooltip();
+}
+
+function renderTooltipVoicing() {
+  const voicing = state.hoveredChordVoicings[state.hoveredVoicingIndex];
+  if (!voicing) {
+    return;
+  }
+
+  elements.tooltipChordNotes.textContent = voicing.noteNames.join(" ");
+  elements.tooltipVoicingIndex.textContent = `${state.hoveredVoicingIndex + 1} / ${state.hoveredChordVoicings.length}`;
+  elements.tooltipPrev.disabled = state.hoveredVoicingIndex === 0;
+  elements.tooltipNext.disabled =
+    state.hoveredVoicingIndex === state.hoveredChordVoicings.length - 1;
+  elements.tooltipPiano.innerHTML = renderPianoKeyboard(voicing.noteNumbers);
 }
 
 function repositionVisibleChordTooltip() {
@@ -1092,14 +1225,14 @@ function finalizePendingDelete() {
 }
 
 function renderPianoKeyboard(noteNames) {
-  const activeSet = new Set(noteNames.map((note) => canonicalizeNoteName(note)));
-  const whiteKeysMarkup = WHITE_PIANO_KEYS.map((note) => {
-    const isActive = activeSet.has(note);
+  const activeSet = new Set(noteNames);
+  const whiteKeysMarkup = WHITE_PIANO_KEYS_EXTENDED.map(({ note, midi }) => {
+    const isActive = activeSet.has(midi);
     return `<div class="piano-key white ${isActive ? "active" : ""}">${note}</div>`;
   }).join("");
 
-  const blackKeysMarkup = BLACK_PIANO_KEYS.map(({ note, left }) => {
-    const isActive = activeSet.has(note);
+  const blackKeysMarkup = BLACK_PIANO_KEYS.map(({ note, midi, left }) => {
+    const isActive = activeSet.has(midi);
     return `<div class="piano-key black ${isActive ? "active" : ""}" style="left: ${left}">${note}</div>`;
   }).join("");
 
@@ -1111,18 +1244,18 @@ function renderPianoKeyboard(noteNames) {
   `;
 }
 
-function getChordShape(chord) {
+function getChordVoicings(chord) {
   const trimmed = chord.trim();
   const match = trimmed.match(/^([A-G](?:#|b)?)([^/]*)?(?:\/([A-G](?:#|b)?))?$/);
   if (!match) {
-    return null;
+    return [];
   }
 
   const [, root, rawSuffix = "", bass] = match;
   const normalizedRoot = FLAT_TO_SHARP[root] || root;
   const rootIndex = SHARP_NOTES.indexOf(normalizedRoot);
   if (rootIndex === -1) {
-    return null;
+    return [];
   }
 
   const suffix = rawSuffix.toLowerCase();
@@ -1160,18 +1293,79 @@ function getChordShape(chord) {
 
   const pitchClasses = [...new Set(intervals.map((interval) => (rootIndex + interval) % 12))];
 
-  if (bass) {
-    const bassIndex = SHARP_NOTES.indexOf(FLAT_TO_SHARP[bass] || bass);
-    if (bassIndex !== -1 && !pitchClasses.includes(bassIndex)) {
-      pitchClasses.unshift(bassIndex);
+  const rootMidi = 48 + rootIndex;
+  const sortedIntervals = [...new Set(intervals)].sort((a, b) => a - b);
+  const baseVoicing = sortedIntervals.map((interval) => rootMidi + interval);
+  const noteNames = pitchClasses.map((index) => PITCH_CLASS_TO_DISPLAY[index]);
+  const voicings = [];
+  const inversionCount = Math.min(3, baseVoicing.length);
+
+  for (let inversion = 0; inversion < inversionCount; inversion += 1) {
+    const workingNotes = [...baseVoicing];
+    for (let shift = 0; shift < inversion; shift += 1) {
+      const moved = workingNotes.shift();
+      if (typeof moved === "number") {
+        workingNotes.push(moved + 12);
+      }
     }
+
+    const adjusted = workingNotes.map((note) => {
+      while (note > 72) {
+        note -= 12;
+      }
+      while (note < 48) {
+        note += 12;
+      }
+      return note;
+    }).sort((a, b) => a - b);
+
+    if (bass) {
+      const bassIndex = SHARP_NOTES.indexOf(FLAT_TO_SHARP[bass] || bass);
+      if (bassIndex !== -1) {
+        let bassMidi = 48 + bassIndex;
+        while (bassMidi >= adjusted[0]) {
+          bassMidi -= 12;
+        }
+        adjusted.unshift(Math.max(36, bassMidi));
+      }
+    }
+
+    voicings.push({
+      noteNames,
+      noteNumbers: adjusted,
+    });
   }
 
-  return {
-    noteNames: pitchClasses.map((index) => PITCH_CLASS_TO_DISPLAY[index]),
-  };
+  return voicings;
 }
 
 function canonicalizeNoteName(note) {
   return SHARP_TO_FLAT[note] ? note : FLAT_TO_SHARP[note] || note;
+}
+
+function getSavedVoicingIndex(songId, chordName, optionCount) {
+  if (!songId || !chordName || optionCount <= 0) {
+    return 0;
+  }
+
+  const key = getVoicingSelectionKey(songId, chordName);
+  const savedIndex = state.chordVoicingSelections[key];
+  if (typeof savedIndex !== "number") {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(savedIndex, optionCount - 1));
+}
+
+function saveVoicingSelection(songId, chordName, index) {
+  if (!songId || !chordName) {
+    return;
+  }
+
+  state.chordVoicingSelections[getVoicingSelectionKey(songId, chordName)] = index;
+  saveChordVoicingSelections();
+}
+
+function getVoicingSelectionKey(songId, chordName) {
+  return `${songId}::${chordName}`;
 }

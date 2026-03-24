@@ -180,8 +180,19 @@
             <pre id="song-preview" class="song-preview">No song selected yet.</pre>
             <div id="chord-tooltip" class="chord-tooltip" hidden>
               <div class="tooltip-header">
-                <strong id="tooltip-chord-name">C</strong>
-                <span id="tooltip-chord-notes">C E G</span>
+                <div class="tooltip-title-group">
+                  <strong id="tooltip-chord-name">C</strong>
+                  <span id="tooltip-chord-notes">C E G</span>
+                </div>
+                <div class="tooltip-controls">
+                  <button id="tooltip-prev" class="tooltip-arrow" type="button" aria-label="Previous voicing">
+                    &#x2039;
+                  </button>
+                  <span id="tooltip-voicing-index" class="tooltip-voicing-index">1 / 3</span>
+                  <button id="tooltip-next" class="tooltip-arrow" type="button" aria-label="Next voicing">
+                    &#x203A;
+                  </button>
+                </div>
               </div>
               <div id="tooltip-piano" class="tooltip-piano"></div>
             </div>

@@ -399,15 +399,15 @@ select {
 .chord-tooltip {
   position: fixed;
   z-index: 20;
-  min-width: 220px;
-  max-width: 280px;
+  min-width: 280px;
+  max-width: 340px;
   padding: 14px;
   border-radius: 18px;
   background: rgba(42, 28, 16, 0.96);
   color: #f9e8d6;
   border: 1px solid rgba(255, 209, 159, 0.16);
   box-shadow: 0 20px 50px rgba(20, 11, 5, 0.32);
-  pointer-events: none;
+  pointer-events: auto;
   white-space: normal;
   line-height: 1.2;
 }
@@ -461,10 +461,16 @@ select {
 
 .tooltip-header {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.tooltip-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .tooltip-header strong {
@@ -476,9 +482,37 @@ select {
   font-size: 0.85rem;
 }
 
+.tooltip-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip-arrow {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 209, 159, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 248, 239, 0.08);
+  color: #f9e8d6;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.tooltip-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tooltip-voicing-index {
+  min-width: 40px;
+  text-align: center;
+}
+
 .tooltip-piano {
   position: relative;
-  height: 82px;
+  height: 88px;
 }
 
 .piano-keyboard {
@@ -488,8 +522,8 @@ select {
 
 .piano-white-keys {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(15, 1fr);
+  gap: 3px;
   height: 100%;
 }
 
@@ -498,7 +532,7 @@ select {
   align-items: flex-end;
   justify-content: center;
   border-radius: 0 0 10px 10px;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 700;
   user-select: none;
 }
@@ -524,7 +558,7 @@ select {
 .piano-key.black {
   position: absolute;
   top: 0;
-  width: calc((100% - 24px) / 7 * 0.64);
+  width: calc((100% - 42px) / 15 * 0.64);
   height: 52px;
   border-radius: 0 0 8px 8px;
   background: linear-gradient(180deg, #433023 0%, #160e08 100%);
@@ -588,6 +622,15 @@ select {
     right: 16px;
     bottom: 16px;
     justify-content: space-between;
+  }
+
+  .tooltip-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tooltip-controls {
+    justify-content: flex-end;
   }
 
   .tab-button,
