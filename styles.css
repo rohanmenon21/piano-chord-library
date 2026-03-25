@@ -377,6 +377,14 @@ select {
   flex: 1;
 }
 
+.sort-field {
+  gap: 6px;
+}
+
+.sort-field span {
+  margin-bottom: 0;
+}
+
 .form-actions {
   align-items: center;
 }

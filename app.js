@@ -2,6 +2,7 @@ const PENDING_DELETE_KEY = "piano-chord-library-pending-delete-v1";
 const CHORD_VOICING_KEY = "piano-chord-library-chord-voicings-v1";
 const UNDO_WINDOW_MS = 5000;
 const AUTOSAVE_MS = 700;
+const DEFAULT_SORT_MODE = "last_viewed";
 const IMPORT_PROXIES = [
   (url) => url,
   (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//, "")}`,
@@ -94,6 +95,7 @@ const state = {
   songs: [],
   selectedSongId: null,
   searchTerm: "",
+  sortMode: DEFAULT_SORT_MODE,
   saveStatusTimer: null,
   autosaveTimer: null,
   activeTab: "edit",
@@ -139,6 +141,7 @@ const elements = {
   librarySubtitle: document.querySelector("#library-subtitle"),
   songList: document.querySelector("#song-list"),
   songCount: document.querySelector("#song-count"),
+  songSort: document.querySelector("#song-sort"),
   songSearch: document.querySelector("#song-search"),
   newSongButton: document.querySelector("#new-song-button"),
   deleteSongButton: document.querySelector("#delete-song-button"),
@@ -246,6 +249,9 @@ function bindEvents() {
   elements.songSearch.addEventListener("input", (event) => {
     state.searchTerm = event.target.value.trim().toLowerCase();
     renderSongList();
+  });
+  elements.songSort.addEventListener("change", (event) => {
+    void handleSortChange(event.target.value);
   });
   elements.editTab.addEventListener("click", () => switchTab("edit"));
   elements.previewTab.addEventListener("click", () => switchTab("preview"));
@@ -470,6 +476,7 @@ async function ensureProfileForUser(user) {
     id: user.id,
     display_name: defaultDisplayName,
     email: user.email,
+    preferred_song_sort: state.profile?.preferred_song_sort || DEFAULT_SORT_MODE,
   };
 
   const { error } = await state.supabase
@@ -481,7 +488,7 @@ async function ensureProfileForUser(user) {
 
   const { data, error: loadError } = await state.supabase
     .from("profiles")
-    .select("id, display_name, email, created_at, updated_at")
+    .select("id, display_name, email, preferred_song_sort, created_at, updated_at")
     .eq("id", user.id)
     .single();
   if (loadError) {
@@ -489,6 +496,7 @@ async function ensureProfileForUser(user) {
   }
 
   state.profile = data;
+  state.sortMode = normalizeSortMode(data?.preferred_song_sort);
 }
 
 async function handleProfileSubmit(event) {
@@ -506,7 +514,7 @@ async function handleProfileSubmit(event) {
       display_name: displayName,
     })
     .eq("id", state.user.id)
-    .select("id, display_name, email, created_at, updated_at")
+    .select("id, display_name, email, preferred_song_sort, created_at, updated_at")
     .single();
 
   if (error) {
@@ -537,6 +545,10 @@ function showAuthStatus(message, isError) {
   elements.authStatus.style.color = isError ? "#9b2f12" : "";
 }
 
+function normalizeSortMode(value) {
+  return ["last_viewed", "title", "artist"].includes(value) ? value : DEFAULT_SORT_MODE;
+}
+
 function populateKeySelect() {
   elements.originalKey.innerHTML = KEY_OPTIONS.map(
     (key) => `<option value="${key}">${key}</option>`,
@@ -561,6 +573,7 @@ async function loadSongsForCurrentUser() {
   if (state.songs.length > 0) {
     state.selectedSongId = state.songs[0].id;
     state.activeTab = "preview";
+    await markSongViewed(state.selectedSongId, { rerender: false });
   } else {
     createBlankSong();
   }
@@ -576,6 +589,7 @@ function mapSongRowToState(row) {
     savedKey: row.saved_key || "C",
     content: normalizeLineEndings(row.content || ""),
     updatedAt: new Date(row.updated_at || Date.now()).getTime(),
+    lastViewedAt: new Date(row.last_viewed_at || row.updated_at || Date.now()).getTime(),
     createdAt: new Date(row.created_at || Date.now()).getTime(),
     isDraft: false,
   };
@@ -591,6 +605,7 @@ function mapSongStateToRow(song, { preserveId = false } = {}) {
     saved_key: song.savedKey || transposeKey(song.originalKey || "C", song.savedTranspose || 0),
     content: normalizeLineEndings(song.content || ""),
     updated_at: new Date().toISOString(),
+    last_viewed_at: new Date(song.lastViewedAt || song.updatedAt || Date.now()).toISOString(),
   };
 
   if (preserveId && song.id) {
@@ -614,6 +629,7 @@ function createBlankSong() {
     savedKey: "C",
     content: "",
     updatedAt: Date.now(),
+    lastViewedAt: Date.now(),
     createdAt: Date.now(),
     isDraft: true,
   };
@@ -639,8 +655,12 @@ async function handleSaveSong(event) {
     return;
   }
 
+  const wasDraft = selectedSong.isDraft;
   applyFormToSong(selectedSong);
   await persistCurrentSong("Song saved");
+  if (wasDraft) {
+    await markSongViewed(state.selectedSongId, { rerender: false });
+  }
   state.activeTab = "preview";
   render();
 }
@@ -732,15 +752,7 @@ async function persistCurrentSong(message) {
 function replaceSongInState(oldId, nextSong) {
   state.songs = state.songs
     .map((song) => (song.id === oldId ? nextSong : song))
-    .sort((a, b) => {
-      if (a.isDraft && !b.isDraft) {
-        return -1;
-      }
-      if (!a.isDraft && b.isDraft) {
-        return 1;
-      }
-      return b.updatedAt - a.updatedAt;
-    });
+    .sort(compareSongsForSortMode);
 }
 
 async function deleteSelectedSong() {
@@ -794,6 +806,7 @@ async function deleteSelectedSong() {
 }
 
 function render() {
+  elements.songSort.value = state.sortMode;
   renderTabs();
   renderSongList();
   renderSelectedSong();
@@ -842,24 +855,13 @@ function renderSongList() {
 
   elements.songList.querySelectorAll("[data-song-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      clearAutosaveTimer();
-      state.selectedSongId = button.dataset.songId;
-      state.activeTab = "preview";
-      render();
+      void selectSong(button.dataset.songId, { tab: "preview", trackView: true });
     });
   });
 }
 
 function getRenderableSongs() {
-  return [...state.songs].sort((a, b) => {
-    if (a.isDraft && !b.isDraft) {
-      return -1;
-    }
-    if (!a.isDraft && b.isDraft) {
-      return 1;
-    }
-    return b.updatedAt - a.updatedAt;
-  });
+  return [...state.songs].sort(compareSongsForSortMode);
 }
 
 function renderSelectedSong() {
@@ -1026,6 +1028,7 @@ async function importFromUrl() {
     selectedSong.savedKey = selectedSong.originalKey;
     selectedSong.content = extractedSong.content;
     selectedSong.updatedAt = Date.now();
+    selectedSong.lastViewedAt = Date.now();
 
     fillForm(selectedSong);
     await persistCurrentSong("Imported song");
@@ -1431,6 +1434,146 @@ function applyFormToSong(song) {
   song.updatedAt = Date.now();
 }
 
+function compareSongsForSortMode(a, b) {
+  if (a.isDraft && !b.isDraft) {
+    return -1;
+  }
+  if (!a.isDraft && b.isDraft) {
+    return 1;
+  }
+
+  if (state.sortMode === "title") {
+    const titleCompare = compareSongText(getSortableTitle(a), getSortableTitle(b));
+    if (titleCompare !== 0) {
+      return titleCompare;
+    }
+    return compareSongText(a.artist || "", b.artist || "");
+  }
+
+  if (state.sortMode === "artist") {
+    const artistA = (a.artist || "").trim();
+    const artistB = (b.artist || "").trim();
+    if (!artistA && artistB) {
+      return 1;
+    }
+    if (artistA && !artistB) {
+      return -1;
+    }
+    const artistCompare = compareSongText(artistA, artistB);
+    if (artistCompare !== 0) {
+      return artistCompare;
+    }
+    return compareSongText(getSortableTitle(a), getSortableTitle(b));
+  }
+
+  const viewedCompare = (b.lastViewedAt || 0) - (a.lastViewedAt || 0);
+  if (viewedCompare !== 0) {
+    return viewedCompare;
+  }
+
+  const updatedCompare = (b.updatedAt || 0) - (a.updatedAt || 0);
+  if (updatedCompare !== 0) {
+    return updatedCompare;
+  }
+
+  return compareSongText(getSortableTitle(a), getSortableTitle(b));
+}
+
+function getSortableTitle(song) {
+  return (song.title || "").trim() || "Untitled Song";
+}
+
+function compareSongText(left, right) {
+  return left.localeCompare(right, undefined, {
+    sensitivity: "base",
+    numeric: true,
+  });
+}
+
+async function handleSortChange(nextSortMode) {
+  const normalizedSortMode = normalizeSortMode(nextSortMode);
+  if (normalizedSortMode === state.sortMode) {
+    renderSongList();
+    return;
+  }
+
+  state.sortMode = normalizedSortMode;
+  renderSongList();
+  await savePreferredSortMode();
+}
+
+async function savePreferredSortMode() {
+  if (!state.user || !state.profile) {
+    return;
+  }
+
+  const { data, error } = await state.supabase
+    .from("profiles")
+    .update({
+      preferred_song_sort: state.sortMode,
+    })
+    .eq("id", state.user.id)
+    .select("id, display_name, email, preferred_song_sort, created_at, updated_at")
+    .single();
+
+  if (error) {
+    console.error(error);
+    elements.profileStatus.textContent = error.message || "Unable to save sort preference.";
+    return;
+  }
+
+  state.profile = data;
+  state.sortMode = normalizeSortMode(data.preferred_song_sort);
+  renderSongList();
+}
+
+async function selectSong(songId, { tab = state.activeTab, trackView = true } = {}) {
+  clearAutosaveTimer();
+  state.selectedSongId = songId;
+  state.activeTab = tab;
+  render();
+
+  if (trackView) {
+    await markSongViewed(songId);
+  }
+}
+
+async function markSongViewed(songId, { rerender = true } = {}) {
+  const song = state.songs.find((entry) => entry.id === songId);
+  if (!song || song.isDraft) {
+    return;
+  }
+
+  const viewedAt = Date.now();
+  song.lastViewedAt = viewedAt;
+  if (rerender) {
+    renderSongList();
+  }
+
+  try {
+    const { data, error } = await state.supabase
+      .from("songs")
+      .update({
+        last_viewed_at: new Date(viewedAt).toISOString(),
+      })
+      .eq("id", songId)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    replaceSongInState(songId, mapSongRowToState(data));
+    if (rerender) {
+      renderSongList();
+      renderSelectedSong();
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 function setSaveStatus(message) {
   elements.saveStatus.textContent = message;
 
@@ -1604,6 +1747,8 @@ async function undoDelete() {
     state.selectedSongId = restoredSong.id;
     state.activeTab = "preview";
     clearPendingDelete();
+    render();
+    await markSongViewed(restoredSong.id, { rerender: false });
     render();
   } catch (error) {
     console.error(error);

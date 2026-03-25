@@ -4,6 +4,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default 'Piano Player',
   email text,
+  preferred_song_sort text not null default 'last_viewed',
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -17,9 +18,16 @@ create table if not exists public.songs (
   saved_transpose integer not null default 0,
   saved_key text not null default 'C',
   content text not null default '',
+  last_viewed_at timestamptz not null default timezone('utc', now()),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.profiles
+add column if not exists preferred_song_sort text not null default 'last_viewed';
+
+alter table public.songs
+add column if not exists last_viewed_at timestamptz not null default timezone('utc', now());
 
 create index if not exists songs_user_id_updated_at_idx
 on public.songs (user_id, updated_at desc);
