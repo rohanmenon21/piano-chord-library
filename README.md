@@ -1,36 +1,47 @@
 # Piano Chord Library
 
-A simple local-first web app for saving songs with piano chords above lyrics and transposing them up or down by semitone.
+A hosted piano chord web app with private user accounts, per-user song libraries, URL import, transposition, delete/undo, and interactive chord voicing previews.
 
-## What it does
+## Stack
 
-- Saves songs in your browser with `localStorage`
-- Lets you paste chord sheets directly into a textarea
-- Keeps track of the song's `originalKey`
-- Stores the currently saved transposed position separately as `savedTranspose`
-- Stores the resulting transposed key separately as `savedKey`
-- Transposes common chord formats such as `C`, `Bb`, `F#m7`, `Gsus4`, and slash chords like `D/F#`
+- Frontend: static HTML/CSS/JS
+- Auth + Database: Supabase
+- Hosting: Vercel
+- Runtime config: `/api/config` Vercel serverless function
 
-## How to use it
+## Features
 
-1. Open [`index.html`](/Users/rohanmenon/Documents/New project/index.html) in your browser.
-2. Click `New Song`.
-3. Enter the title, artist, original key, and paste the chord/lyric sheet.
-4. Click `Save Song`.
-5. Use the transpose buttons in the preview panel to move the chords up or down.
+- Email/password sign-up and sign-in
+- Private per-user song libraries
+- Song editing, preview, transposition, delete/undo
+- URL import for supported song pages
+- Hover chord previews with alternate voicings
+- Profile page with display name and sign-out
+
+## Supabase Setup
+
+1. Create a Supabase project.
+2. In the Supabase SQL editor, run [`supabase/schema.sql`](/Users/rohanmenon/Documents/New project/supabase/schema.sql).
+3. In Supabase Auth, enable email/password sign-in.
+4. Copy your project URL and anon key.
+
+## Vercel Setup
+
+1. Import this project into Vercel.
+2. Add these environment variables in Vercel:
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+3. Deploy.
+
+The frontend fetches those values from [`api/config.js`](/Users/rohanmenon/Documents/New project/api/config.js).
+
+## Local Development
+
+1. Copy [`.env.example`](/Users/rohanmenon/Documents/New project/.env.example) values into your Vercel/local environment setup.
+2. Run the app through a web server or Vercel dev, not by opening `index.html` directly from `file://`.
 
 ## Notes
 
-- Songs are stored only in the current browser on the current device.
-- The original pasted sheet is preserved exactly as entered.
-- The transposed version is generated for preview from the saved transpose amount.
-
-## Example format
-
-```text
-C        G/B      Am
-Amazing grace, how sweet the sound
-
-F        C/E      Dm7   G
-That saved a wretch like me
-```
+- Existing browser `localStorage` song data is not migrated into hosted accounts.
+- Song data is private by default through Supabase Row Level Security.
+- Chord voicing popup preferences still persist locally per browser.

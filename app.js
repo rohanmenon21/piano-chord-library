@@ -1,7 +1,7 @@
-const STORAGE_KEY = "piano-chord-library-v1";
 const PENDING_DELETE_KEY = "piano-chord-library-pending-delete-v1";
 const CHORD_VOICING_KEY = "piano-chord-library-chord-voicings-v1";
 const UNDO_WINDOW_MS = 5000;
+const AUTOSAVE_MS = 700;
 const IMPORT_PROXIES = [
   (url) => url,
   (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//, "")}`,
@@ -40,7 +40,6 @@ const SHARP_TO_FLAT = {
   "A#": "Bb",
 };
 const PITCH_CLASS_TO_DISPLAY = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
-const WHITE_PIANO_KEYS = ["C", "D", "E", "F", "G", "A", "B"];
 const BLACK_PIANO_KEYS = [
   { note: "C#", midi: 49, left: "5.6%" },
   { note: "D#", midi: 51, left: "12.1%" },
@@ -87,11 +86,19 @@ const NON_CHORD_LABELS = new Set([
 ]);
 
 const state = {
-  songs: loadSongs(),
+  supabase: null,
+  config: null,
+  session: null,
+  user: null,
+  profile: null,
+  songs: [],
   selectedSongId: null,
   searchTerm: "",
   saveStatusTimer: null,
+  autosaveTimer: null,
   activeTab: "edit",
+  currentView: "loading",
+  authMode: "signin",
   hoveredChord: null,
   hoveredChordElement: null,
   hoveredChordVoicings: [],
@@ -105,6 +112,31 @@ const state = {
 };
 
 const elements = {
+  body: document.body,
+  loadingScreen: document.querySelector("#loading-screen"),
+  loadingMessage: document.querySelector("#loading-message"),
+  authShell: document.querySelector("#auth-shell"),
+  authTitle: document.querySelector("#auth-title"),
+  authSubtitle: document.querySelector("#auth-subtitle"),
+  authForm: document.querySelector("#auth-form"),
+  authDisplayNameField: document.querySelector("#auth-display-name-field"),
+  authDisplayName: document.querySelector("#auth-display-name"),
+  authEmail: document.querySelector("#auth-email"),
+  authPassword: document.querySelector("#auth-password"),
+  authSubmit: document.querySelector("#auth-submit"),
+  authToggle: document.querySelector("#auth-toggle"),
+  authStatus: document.querySelector("#auth-status"),
+  appShell: document.querySelector("#app-shell"),
+  profileScreen: document.querySelector("#profile-screen"),
+  profileButton: document.querySelector("#profile-button"),
+  profileClose: document.querySelector("#profile-close"),
+  profileForm: document.querySelector("#profile-form"),
+  profileDisplayName: document.querySelector("#profile-display-name"),
+  profileEmail: document.querySelector("#profile-email"),
+  profileStatus: document.querySelector("#profile-status"),
+  signOutButton: document.querySelector("#sign-out-button"),
+  libraryHeading: document.querySelector("#library-heading"),
+  librarySubtitle: document.querySelector("#library-subtitle"),
   songList: document.querySelector("#song-list"),
   songCount: document.querySelector("#song-count"),
   songSearch: document.querySelector("#song-search"),
@@ -145,38 +177,87 @@ const elements = {
   resetTranspose: document.querySelector("#reset-transpose"),
 };
 
-initialize();
+void initialize();
 
-function initialize() {
+async function initialize() {
   populateKeySelect();
-  reconcilePendingDelete();
-
-  if (state.songs.length > 0) {
-    state.selectedSongId = state.songs[0].id;
-    state.activeTab = "preview";
-  } else {
-    createBlankSong();
-  }
-
   bindEvents();
-  render();
+  setLoadingState("Loading hosted workspace...");
+
+  try {
+    const config = await loadAppConfig();
+    const supabaseModule = await import("https://esm.sh/@supabase/supabase-js@2");
+    state.config = config;
+    state.supabase = supabaseModule.createClient(
+      config.supabaseUrl,
+      config.supabaseAnonKey,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+        },
+      },
+    );
+
+    state.supabase.auth.onAuthStateChange((event, session) => {
+      void handleSessionChange(session, event);
+    });
+
+    const {
+      data: { session },
+    } = await state.supabase.auth.getSession();
+    await handleSessionChange(session, "INITIAL_SESSION");
+  } catch (error) {
+    console.error(error);
+    showAuthStatus(
+      error.message || "Unable to start the hosted app. Check your Supabase configuration.",
+      true,
+    );
+    showAuthScreen({ preserveStatus: true });
+  }
 }
 
 function bindEvents() {
-  elements.form.addEventListener("submit", handleSaveSong);
+  elements.authForm.addEventListener("submit", (event) => {
+    void handleAuthSubmit(event);
+  });
+  elements.authToggle.addEventListener("click", toggleAuthMode);
+  elements.profileButton.addEventListener("click", openProfileScreen);
+  elements.profileClose.addEventListener("click", closeProfileScreen);
+  elements.profileForm.addEventListener("submit", (event) => {
+    void handleProfileSubmit(event);
+  });
+  elements.signOutButton.addEventListener("click", () => {
+    void signOut();
+  });
+  elements.form.addEventListener("submit", (event) => {
+    void handleSaveSong(event);
+  });
   elements.newSongButton.addEventListener("click", createBlankSong);
-  elements.deleteSongButton.addEventListener("click", deleteSelectedSong);
-  elements.undoButton.addEventListener("click", undoDelete);
-  elements.importButton.addEventListener("click", importFromUrl);
+  elements.deleteSongButton.addEventListener("click", () => {
+    void deleteSelectedSong();
+  });
+  elements.undoButton.addEventListener("click", () => {
+    void undoDelete();
+  });
+  elements.importButton.addEventListener("click", () => {
+    void importFromUrl();
+  });
   elements.songSearch.addEventListener("input", (event) => {
     state.searchTerm = event.target.value.trim().toLowerCase();
     renderSongList();
   });
   elements.editTab.addEventListener("click", () => switchTab("edit"));
   elements.previewTab.addEventListener("click", () => switchTab("preview"));
-  elements.transposeUp.addEventListener("click", () => transposeSelectedSong(1));
-  elements.transposeDown.addEventListener("click", () => transposeSelectedSong(-1));
-  elements.resetTranspose.addEventListener("click", () => resetTranspose());
+  elements.transposeUp.addEventListener("click", () => {
+    void transposeSelectedSong(1);
+  });
+  elements.transposeDown.addEventListener("click", () => {
+    void transposeSelectedSong(-1);
+  });
+  elements.resetTranspose.addEventListener("click", () => {
+    void resetTranspose();
+  });
   elements.preview.addEventListener("mouseover", handlePreviewMouseOver);
   elements.preview.addEventListener("mousemove", handlePreviewMouseMove);
   elements.preview.addEventListener("mouseleave", scheduleHideChordTooltip);
@@ -192,56 +273,268 @@ function bindEvents() {
   });
 }
 
-async function importFromUrl() {
-  const rawUrl = elements.importUrl.value.trim();
-  if (!rawUrl) {
-    setImportStatus("Add a URL first");
+async function loadAppConfig() {
+  if (window.APP_CONFIG?.supabaseUrl && window.APP_CONFIG?.supabaseAnonKey) {
+    return window.APP_CONFIG;
+  }
+
+  const response = await fetch("/api/config", {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Missing hosted configuration. Set SUPABASE_URL and SUPABASE_ANON_KEY.");
+  }
+
+  const config = await response.json();
+  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    throw new Error("Supabase configuration is incomplete.");
+  }
+
+  return config;
+}
+
+async function handleSessionChange(session) {
+  state.session = session;
+  state.user = session?.user ?? null;
+  hideChordTooltip();
+  clearAutosaveTimer();
+
+  if (!session) {
+    state.profile = null;
+    state.songs = [];
+    state.selectedSongId = null;
+    state.activeTab = "edit";
+    clearPendingDelete();
+    showAuthScreen();
     return;
   }
 
-  let normalizedUrl;
+  setLoadingState("Loading your songs...");
   try {
-    normalizedUrl = new URL(rawUrl).toString();
-  } catch (error) {
-    setImportStatus("That URL does not look valid");
-    return;
-  }
-
-  elements.importButton.disabled = true;
-  setImportStatus("Fetching page...");
-
-  try {
-    const html = await fetchImportHtml(normalizedUrl);
-    const extractedSong = extractSongFromHtml(html, normalizedUrl);
-
-    if (!extractedSong.content.trim()) {
-      throw new Error("No usable chord/lyric block found on that page");
-    }
-
-    const selectedSong = getSelectedSong();
-    if (!selectedSong) {
-      throw new Error("No editable song is currently selected");
-    }
-
-    selectedSong.title = extractedSong.title || selectedSong.title || "Untitled Song";
-    selectedSong.artist = extractedSong.artist || selectedSong.artist || "";
-    selectedSong.originalKey = extractedSong.originalKey || selectedSong.originalKey || "C";
-    selectedSong.savedTranspose = 0;
-    selectedSong.savedKey = selectedSong.originalKey;
-    selectedSong.content = extractedSong.content;
-    selectedSong.updatedAt = Date.now();
-
-    fillForm(selectedSong);
-    persistSongs("Imported song");
-    syncDraftPreview();
-    renderSongList();
-    setImportStatus("Imported successfully");
+    await ensureProfileForUser(session.user);
+    await loadSongsForCurrentUser();
+    showAppScreen();
   } catch (error) {
     console.error(error);
-    setImportStatus(error.message || "Import failed");
-  } finally {
-    elements.importButton.disabled = false;
+    showAuthStatus(
+      error.message || "We could not load your account. Please try again.",
+      true,
+    );
+    showAuthScreen({ preserveStatus: true });
   }
+}
+
+function setLoadingState(message) {
+  state.currentView = "loading";
+  elements.loadingMessage.textContent = message;
+  elements.loadingScreen.hidden = false;
+  elements.authShell.hidden = true;
+  elements.appShell.hidden = true;
+  elements.profileScreen.hidden = true;
+  elements.body.classList.remove("modal-open");
+}
+
+function showAuthScreen({ preserveStatus = false } = {}) {
+  state.currentView = "auth";
+  elements.loadingScreen.hidden = true;
+  elements.authShell.hidden = false;
+  elements.appShell.hidden = true;
+  elements.profileScreen.hidden = true;
+  elements.body.classList.remove("modal-open");
+  updateAuthMode({ preserveStatus });
+}
+
+function showAppScreen() {
+  state.currentView = "library";
+  elements.loadingScreen.hidden = true;
+  elements.authShell.hidden = true;
+  elements.appShell.hidden = false;
+  elements.profileScreen.hidden = true;
+  elements.body.classList.remove("modal-open");
+  updateLibraryHeader();
+  updateProfileForm();
+  render();
+}
+
+function openProfileScreen() {
+  if (!state.user) {
+    return;
+  }
+
+  updateProfileForm();
+  elements.profileScreen.hidden = false;
+  elements.body.classList.add("modal-open");
+}
+
+function closeProfileScreen() {
+  elements.profileScreen.hidden = true;
+  elements.body.classList.remove("modal-open");
+}
+
+function toggleAuthMode() {
+  state.authMode = state.authMode === "signin" ? "signup" : "signin";
+  updateAuthMode();
+}
+
+function updateAuthMode({ preserveStatus = false } = {}) {
+  const isSignUp = state.authMode === "signup";
+  elements.authTitle.textContent = isSignUp ? "Create Account" : "Sign In";
+  elements.authSubtitle.textContent = isSignUp
+    ? "Create a private account to store your own song library."
+    : "Use your email and password to open your song library.";
+  elements.authSubmit.textContent = isSignUp ? "Create Account" : "Sign In";
+  elements.authToggle.textContent = isSignUp
+    ? "Already have an account?"
+    : "Need an account?";
+  elements.authDisplayNameField.hidden = !isSignUp;
+  elements.authPassword.autocomplete = isSignUp ? "new-password" : "current-password";
+  if (!preserveStatus) {
+    showAuthStatus("", false);
+  }
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  if (!state.supabase) {
+    return;
+  }
+
+  const email = elements.authEmail.value.trim();
+  const password = elements.authPassword.value;
+  const displayName = elements.authDisplayName.value.trim();
+
+  if (!email || !password) {
+    showAuthStatus("Email and password are required.", true);
+    return;
+  }
+
+  showAuthStatus(
+    state.authMode === "signup" ? "Creating your account..." : "Signing you in...",
+    false,
+  );
+
+  try {
+    if (state.authMode === "signup") {
+      const { error } = await state.supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: displayName,
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      showAuthStatus(
+        "Account created. If email confirmation is enabled, check your inbox before signing in.",
+        false,
+      );
+      state.authMode = "signin";
+      updateAuthMode({ preserveStatus: true });
+      elements.authPassword.value = "";
+      return;
+    }
+
+    const { error } = await state.supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    showAuthStatus(error.message || "Authentication failed.", true);
+  }
+}
+
+async function signOut() {
+  if (!state.supabase) {
+    return;
+  }
+
+  await state.supabase.auth.signOut();
+  closeProfileScreen();
+}
+
+async function ensureProfileForUser(user) {
+  const defaultDisplayName =
+    user.user_metadata?.display_name || user.email?.split("@")[0] || "Piano Player";
+  const upsertPayload = {
+    id: user.id,
+    display_name: defaultDisplayName,
+    email: user.email,
+  };
+
+  const { error } = await state.supabase
+    .from("profiles")
+    .upsert(upsertPayload, { onConflict: "id" });
+  if (error) {
+    throw error;
+  }
+
+  const { data, error: loadError } = await state.supabase
+    .from("profiles")
+    .select("id, display_name, email, created_at, updated_at")
+    .eq("id", user.id)
+    .single();
+  if (loadError) {
+    throw loadError;
+  }
+
+  state.profile = data;
+}
+
+async function handleProfileSubmit(event) {
+  event.preventDefault();
+  if (!state.user) {
+    return;
+  }
+
+  const displayName = elements.profileDisplayName.value.trim() || "Piano Player";
+  elements.profileStatus.textContent = "Saving profile...";
+
+  const { data, error } = await state.supabase
+    .from("profiles")
+    .update({
+      display_name: displayName,
+    })
+    .eq("id", state.user.id)
+    .select("id, display_name, email, created_at, updated_at")
+    .single();
+
+  if (error) {
+    elements.profileStatus.textContent = error.message || "Unable to save profile.";
+    return;
+  }
+
+  state.profile = data;
+  updateLibraryHeader();
+  elements.profileStatus.textContent = "Profile saved";
+}
+
+function updateProfileForm() {
+  elements.profileDisplayName.value = state.profile?.display_name || "";
+  elements.profileEmail.value = state.user?.email || "";
+  elements.profileStatus.textContent = "";
+}
+
+function updateLibraryHeader() {
+  const displayName =
+    state.profile?.display_name || state.user?.email?.split("@")[0] || "Your";
+  elements.libraryHeading.textContent = `${displayName}'s Library`;
+  elements.librarySubtitle.textContent = state.user?.email || "Your songs are private to your account.";
+}
+
+function showAuthStatus(message, isError) {
+  elements.authStatus.textContent = message;
+  elements.authStatus.style.color = isError ? "#9b2f12" : "";
 }
 
 function populateKeySelect() {
@@ -250,102 +543,65 @@ function populateKeySelect() {
   ).join("");
 }
 
-function loadSongs() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
+async function loadSongsForCurrentUser() {
+  const { data, error } = await state.supabase
+    .from("songs")
+    .select("*")
+    .order("updated_at", { ascending: false });
 
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
+  if (error) {
+    throw error;
+  }
 
-    return parsed.map((song) => {
-      const originalKey = song.originalKey || "C";
-      const savedTranspose = Number(song.savedTranspose) || 0;
-      return {
-        ...song,
-        id: song.id || createSongId(),
-        title: song.title || "",
-        artist: song.artist || "",
-        content: normalizeLineEndings(song.content || ""),
-        originalKey,
-        savedTranspose,
-        savedKey: song.savedKey || transposeKey(originalKey, savedTranspose),
-        updatedAt: song.updatedAt || Date.now(),
-      };
-    });
-  } catch (error) {
-    console.error("Unable to load saved songs", error);
-    return [];
+  state.songs = (data || []).map(mapSongRowToState);
+  state.searchTerm = "";
+  elements.songSearch.value = "";
+  reconcilePendingDeleteForCurrentUser();
+
+  if (state.songs.length > 0) {
+    state.selectedSongId = state.songs[0].id;
+    state.activeTab = "preview";
+  } else {
+    createBlankSong();
   }
 }
 
-function loadPendingDelete() {
-  try {
-    const raw = localStorage.getItem(PENDING_DELETE_KEY);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!parsed?.song || !parsed?.expiresAt) {
-      return null;
-    }
-
-    if (parsed.expiresAt <= Date.now()) {
-      localStorage.removeItem(PENDING_DELETE_KEY);
-      return null;
-    }
-
-    return {
-      ...parsed,
-      song: {
-        ...parsed.song,
-        content: normalizeLineEndings(parsed.song.content || ""),
-      },
-    };
-  } catch (error) {
-    console.error("Unable to load pending delete", error);
-    return null;
-  }
+function mapSongRowToState(row) {
+  return {
+    id: row.id,
+    title: row.title || "",
+    artist: row.artist || "",
+    originalKey: row.original_key || "C",
+    savedTranspose: Number(row.saved_transpose) || 0,
+    savedKey: row.saved_key || "C",
+    content: normalizeLineEndings(row.content || ""),
+    updatedAt: new Date(row.updated_at || Date.now()).getTime(),
+    createdAt: new Date(row.created_at || Date.now()).getTime(),
+    isDraft: false,
+  };
 }
 
-function loadChordVoicingSelections() {
-  try {
-    const raw = localStorage.getItem(CHORD_VOICING_KEY);
-    if (!raw) {
-      return {};
-    }
+function mapSongStateToRow(song, { preserveId = false } = {}) {
+  const row = {
+    user_id: state.user?.id || null,
+    title: song.title || "Untitled Song",
+    artist: song.artist || "",
+    original_key: song.originalKey || "C",
+    saved_transpose: Number(song.savedTranspose) || 0,
+    saved_key: song.savedKey || transposeKey(song.originalKey || "C", song.savedTranspose || 0),
+    content: normalizeLineEndings(song.content || ""),
+    updated_at: new Date().toISOString(),
+  };
 
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch (error) {
-    console.error("Unable to load chord voicing selections", error);
-    return {};
-  }
-}
-
-function saveSongs() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.songs));
-}
-
-function savePendingDelete() {
-  if (!state.pendingDelete) {
-    localStorage.removeItem(PENDING_DELETE_KEY);
-    return;
+  if (preserveId && song.id) {
+    row.id = song.id;
   }
 
-  localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(state.pendingDelete));
-}
+  if (song.createdAt) {
+    row.created_at = new Date(song.createdAt).toISOString();
+  }
 
-function saveChordVoicingSelections() {
-  localStorage.setItem(
-    CHORD_VOICING_KEY,
-    JSON.stringify(state.chordVoicingSelections),
-  );
+  return row;
 }
 
 function createBlankSong() {
@@ -358,12 +614,13 @@ function createBlankSong() {
     savedKey: "C",
     content: "",
     updatedAt: Date.now(),
+    createdAt: Date.now(),
+    isDraft: true,
   };
 
-  state.songs.unshift(newSong);
+  state.songs = [newSong, ...state.songs.filter((song) => !song.isDraft)];
   state.selectedSongId = newSong.id;
   state.activeTab = "edit";
-  saveSongs();
   render();
   fillForm(newSong);
   elements.title.focus();
@@ -373,8 +630,9 @@ function getSelectedSong() {
   return state.songs.find((song) => song.id === state.selectedSongId) ?? null;
 }
 
-function handleSaveSong(event) {
+async function handleSaveSong(event) {
   event.preventDefault();
+  clearAutosaveTimer();
 
   const selectedSong = getSelectedSong();
   if (!selectedSong) {
@@ -382,12 +640,110 @@ function handleSaveSong(event) {
   }
 
   applyFormToSong(selectedSong);
-  persistSongs("Song saved");
+  await persistCurrentSong("Song saved");
   state.activeTab = "preview";
   render();
 }
 
-function deleteSelectedSong() {
+function handleDraftChange() {
+  const selectedSong = getSelectedSong();
+  if (!selectedSong) {
+    return;
+  }
+
+  applyFormToSong(selectedSong);
+  syncDraftPreview();
+  renderSongList();
+
+  if (!hasMeaningfulContent(selectedSong)) {
+    setSaveStatus("Draft ready");
+    return;
+  }
+
+  queueAutosave();
+}
+
+function hasMeaningfulContent(song) {
+  return Boolean(
+    (song.title && song.title.trim()) ||
+      (song.artist && song.artist.trim()) ||
+      (song.content && song.content.trim()),
+  );
+}
+
+function queueAutosave() {
+  clearAutosaveTimer();
+  setSaveStatus("Saving...");
+  state.autosaveTimer = window.setTimeout(() => {
+    void persistCurrentSong("Saved automatically");
+  }, AUTOSAVE_MS);
+}
+
+function clearAutosaveTimer() {
+  if (state.autosaveTimer) {
+    window.clearTimeout(state.autosaveTimer);
+    state.autosaveTimer = null;
+  }
+}
+
+async function persistCurrentSong(message) {
+  const selectedSong = getSelectedSong();
+  if (!selectedSong || !state.user) {
+    return;
+  }
+
+  try {
+    let savedSong;
+    if (selectedSong.isDraft) {
+      const { data, error } = await state.supabase
+        .from("songs")
+        .insert(mapSongStateToRow(selectedSong))
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      savedSong = mapSongRowToState(data);
+      replaceSongInState(selectedSong.id, savedSong);
+      state.selectedSongId = savedSong.id;
+    } else {
+      const { data, error } = await state.supabase
+        .from("songs")
+        .update(mapSongStateToRow(selectedSong))
+        .eq("id", selectedSong.id)
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      savedSong = mapSongRowToState(data);
+      replaceSongInState(selectedSong.id, savedSong);
+    }
+
+    setSaveStatus(message);
+    renderSongList();
+    renderSelectedSong();
+  } catch (error) {
+    console.error(error);
+    setSaveStatus(error.message || "Unable to save song");
+  }
+}
+
+function replaceSongInState(oldId, nextSong) {
+  state.songs = state.songs
+    .map((song) => (song.id === oldId ? nextSong : song))
+    .sort((a, b) => {
+      if (a.isDraft && !b.isDraft) {
+        return -1;
+      }
+      if (!a.isDraft && b.isDraft) {
+        return 1;
+      }
+      return b.updatedAt - a.updatedAt;
+    });
+}
+
+async function deleteSelectedSong() {
   const selectedSong = getSelectedSong();
   if (!selectedSong) {
     return;
@@ -402,26 +758,39 @@ function deleteSelectedSong() {
 
   finalizePendingDelete();
 
-  const songIndex = state.songs.findIndex((song) => song.id === selectedSong.id);
-  state.pendingDelete = {
-    song: { ...selectedSong },
-    originalIndex: songIndex,
-    expiresAt: Date.now() + UNDO_WINDOW_MS,
-  };
-  savePendingDelete();
-  schedulePendingDeleteExpiry();
+  try {
+    if (!selectedSong.isDraft) {
+      const { error } = await state.supabase.from("songs").delete().eq("id", selectedSong.id);
+      if (error) {
+        throw error;
+      }
+    }
 
-  state.songs = state.songs.filter((song) => song.id !== selectedSong.id);
+    const songIndex = state.songs.findIndex((song) => song.id === selectedSong.id);
+    state.pendingDelete = {
+      song: { ...selectedSong },
+      originalIndex: songIndex,
+      userId: state.user?.id || null,
+      wasRemote: !selectedSong.isDraft,
+      expiresAt: Date.now() + UNDO_WINDOW_MS,
+    };
+    savePendingDelete();
+    schedulePendingDeleteExpiry();
 
-  if (state.songs.length === 0) {
-    createBlankSong();
-    renderUndoToast();
-    return;
+    state.songs = state.songs.filter((song) => song.id !== selectedSong.id);
+
+    if (state.songs.length === 0) {
+      createBlankSong();
+      renderUndoToast();
+      return;
+    }
+
+    state.selectedSongId = state.songs[0].id;
+    render();
+  } catch (error) {
+    console.error(error);
+    setSaveStatus(error.message || "Unable to delete song");
   }
-
-  state.selectedSongId = state.songs[0].id;
-  saveSongs();
-  render();
 }
 
 function render() {
@@ -445,7 +814,7 @@ function renderTabs() {
 }
 
 function renderSongList() {
-  const filteredSongs = state.songs.filter((song) => {
+  const filteredSongs = getRenderableSongs().filter((song) => {
     const haystack = `${song.title} ${song.artist}`.toLowerCase();
     return haystack.includes(state.searchTerm);
   });
@@ -458,11 +827,10 @@ function renderSongList() {
   }
 
   elements.songList.innerHTML = filteredSongs
-    .sort((a, b) => b.updatedAt - a.updatedAt)
     .map((song) => {
       const activeClass = song.id === state.selectedSongId ? "active" : "";
-      const safeTitle = escapeHtml(song.title || "Untitled Song");
-      const safeArtist = escapeHtml(song.artist || "Unknown artist");
+      const safeTitle = escapeHtml(song.title || (song.isDraft ? "Unsaved Draft" : "Untitled Song"));
+      const safeArtist = escapeHtml(song.artist || (song.isDraft ? "Draft" : "Unknown artist"));
       return `
         <button class="song-list-item ${activeClass}" type="button" data-song-id="${song.id}">
           <strong>${safeTitle}</strong>
@@ -474,6 +842,7 @@ function renderSongList() {
 
   elements.songList.querySelectorAll("[data-song-id]").forEach((button) => {
     button.addEventListener("click", () => {
+      clearAutosaveTimer();
       state.selectedSongId = button.dataset.songId;
       state.activeTab = "preview";
       render();
@@ -481,9 +850,22 @@ function renderSongList() {
   });
 }
 
+function getRenderableSongs() {
+  return [...state.songs].sort((a, b) => {
+    if (a.isDraft && !b.isDraft) {
+      return -1;
+    }
+    if (!a.isDraft && b.isDraft) {
+      return 1;
+    }
+    return b.updatedAt - a.updatedAt;
+  });
+}
+
 function renderSelectedSong() {
   const selectedSong = getSelectedSong();
   if (!selectedSong) {
+    elements.preview.textContent = "No song selected yet.";
     return;
   }
 
@@ -492,7 +874,7 @@ function renderSelectedSong() {
 }
 
 function renderUndoToast() {
-  if (!state.pendingDelete) {
+  if (!state.pendingDelete || state.pendingDelete.userId !== state.user?.id) {
     elements.undoToast.hidden = true;
     return;
   }
@@ -545,18 +927,6 @@ function syncDraftPreview() {
   };
 
   updatePreview(draftSong);
-}
-
-function handleDraftChange() {
-  const selectedSong = getSelectedSong();
-  if (!selectedSong) {
-    return;
-  }
-
-  applyFormToSong(selectedSong);
-  persistSongs("Saved automatically");
-  syncDraftPreview();
-  renderSongList();
 }
 
 function switchTab(tab) {
@@ -618,12 +988,63 @@ function handlePreviewMouseMove(event) {
   }
 }
 
+async function importFromUrl() {
+  const rawUrl = elements.importUrl.value.trim();
+  if (!rawUrl) {
+    setImportStatus("Add a URL first");
+    return;
+  }
+
+  let normalizedUrl;
+  try {
+    normalizedUrl = new URL(rawUrl).toString();
+  } catch (error) {
+    setImportStatus("That URL does not look valid");
+    return;
+  }
+
+  elements.importButton.disabled = true;
+  setImportStatus("Fetching page...");
+
+  try {
+    const html = await fetchImportHtml(normalizedUrl);
+    const extractedSong = extractSongFromHtml(html, normalizedUrl);
+    if (!extractedSong.content.trim()) {
+      throw new Error("No usable chord/lyric block found on that page");
+    }
+
+    let selectedSong = getSelectedSong();
+    if (!selectedSong) {
+      createBlankSong();
+      selectedSong = getSelectedSong();
+    }
+
+    selectedSong.title = extractedSong.title || selectedSong.title || "Untitled Song";
+    selectedSong.artist = extractedSong.artist || selectedSong.artist || "";
+    selectedSong.originalKey = extractedSong.originalKey || selectedSong.originalKey || "C";
+    selectedSong.savedTranspose = 0;
+    selectedSong.savedKey = selectedSong.originalKey;
+    selectedSong.content = extractedSong.content;
+    selectedSong.updatedAt = Date.now();
+
+    fillForm(selectedSong);
+    await persistCurrentSong("Imported song");
+    syncDraftPreview();
+    renderSongList();
+    setImportStatus("Imported successfully");
+  } catch (error) {
+    console.error(error);
+    setImportStatus(error.message || "Import failed");
+  } finally {
+    elements.importButton.disabled = false;
+  }
+}
+
 async function fetchImportHtml(url) {
   let lastError = null;
 
   for (const buildUrl of IMPORT_PROXIES) {
     const targetUrl = buildUrl(url);
-
     try {
       const response = await fetch(targetUrl);
       if (!response.ok) {
@@ -646,7 +1067,7 @@ async function fetchImportHtml(url) {
   );
 }
 
-function transposeSelectedSong(step) {
+async function transposeSelectedSong(step) {
   const selectedSong = getSelectedSong();
   if (!selectedSong) {
     return;
@@ -658,11 +1079,11 @@ function transposeSelectedSong(step) {
     selectedSong.savedTranspose,
   );
   selectedSong.updatedAt = Date.now();
-  persistSongs("Transpose saved");
+  await persistCurrentSong("Transpose saved");
   render();
 }
 
-function resetTranspose() {
+async function resetTranspose() {
   const selectedSong = getSelectedSong();
   if (!selectedSong) {
     return;
@@ -671,7 +1092,7 @@ function resetTranspose() {
   selectedSong.savedTranspose = 0;
   selectedSong.savedKey = selectedSong.originalKey;
   selectedSong.updatedAt = Date.now();
-  persistSongs("Transpose reset");
+  await persistCurrentSong("Transpose reset");
   render();
 }
 
@@ -1010,11 +1431,6 @@ function applyFormToSong(song) {
   song.updatedAt = Date.now();
 }
 
-function persistSongs(message) {
-  saveSongs();
-  setSaveStatus(message);
-}
-
 function setSaveStatus(message) {
   elements.saveStatus.textContent = message;
 
@@ -1162,23 +1578,46 @@ function repositionVisibleChordTooltip() {
   });
 }
 
-function undoDelete() {
+async function undoDelete() {
+  if (!state.pendingDelete || state.pendingDelete.userId !== state.user?.id) {
+    return;
+  }
+
+  try {
+    const { song, originalIndex, wasRemote } = state.pendingDelete;
+    const insertAt = Math.max(0, Math.min(originalIndex ?? 0, state.songs.length));
+    let restoredSong = { ...song };
+
+    if (wasRemote) {
+      const { data, error } = await state.supabase
+        .from("songs")
+        .upsert(mapSongStateToRow(song, { preserveId: true }), { onConflict: "id" })
+        .select("*")
+        .single();
+      if (error) {
+        throw error;
+      }
+      restoredSong = mapSongRowToState(data);
+    }
+
+    state.songs.splice(insertAt, 0, restoredSong);
+    state.selectedSongId = restoredSong.id;
+    state.activeTab = "preview";
+    clearPendingDelete();
+    render();
+  } catch (error) {
+    console.error(error);
+    setSaveStatus(error.message || "Unable to restore song");
+  }
+}
+
+function reconcilePendingDeleteForCurrentUser() {
   if (!state.pendingDelete) {
     return;
   }
 
-  const { song, originalIndex } = state.pendingDelete;
-  const insertAt = Math.max(0, Math.min(originalIndex ?? 0, state.songs.length));
-  state.songs.splice(insertAt, 0, song);
-  state.selectedSongId = song.id;
-  state.activeTab = "preview";
-  saveSongs();
-  clearPendingDelete();
-  render();
-}
-
-function reconcilePendingDelete() {
-  if (!state.pendingDelete) {
+  if (state.pendingDelete.userId !== state.user?.id) {
+    clearPendingDelete();
     return;
   }
 
@@ -1224,8 +1663,8 @@ function finalizePendingDelete() {
   clearPendingDelete();
 }
 
-function renderPianoKeyboard(noteNames) {
-  const activeSet = new Set(noteNames);
+function renderPianoKeyboard(noteNumbers) {
+  const activeSet = new Set(noteNumbers);
   const whiteKeysMarkup = WHITE_PIANO_KEYS_EXTENDED.map(({ note, midi }) => {
     const isActive = activeSet.has(midi);
     return `<div class="piano-key white ${isActive ? "active" : ""}">${note}</div>`;
@@ -1292,7 +1731,6 @@ function getChordVoicings(chord) {
   }
 
   const pitchClasses = [...new Set(intervals.map((interval) => (rootIndex + interval) % 12))];
-
   const rootMidi = 48 + rootIndex;
   const sortedIntervals = [...new Set(intervals)].sort((a, b) => a - b);
   const baseVoicing = sortedIntervals.map((interval) => rootMidi + interval);
@@ -1309,15 +1747,18 @@ function getChordVoicings(chord) {
       }
     }
 
-    const adjusted = workingNotes.map((note) => {
-      while (note > 72) {
-        note -= 12;
-      }
-      while (note < 48) {
-        note += 12;
-      }
-      return note;
-    }).sort((a, b) => a - b);
+    const adjusted = workingNotes
+      .map((note) => {
+        let adjustedNote = note;
+        while (adjustedNote > 72) {
+          adjustedNote -= 12;
+        }
+        while (adjustedNote < 48) {
+          adjustedNote += 12;
+        }
+        return adjustedNote;
+      })
+      .sort((a, b) => a - b);
 
     if (bass) {
       const bassIndex = SHARP_NOTES.indexOf(FLAT_TO_SHARP[bass] || bass);
@@ -1337,10 +1778,6 @@ function getChordVoicings(chord) {
   }
 
   return voicings;
-}
-
-function canonicalizeNoteName(note) {
-  return SHARP_TO_FLAT[note] ? note : FLAT_TO_SHARP[note] || note;
 }
 
 function getSavedVoicingIndex(songId, chordName, optionCount) {
@@ -1368,4 +1805,65 @@ function saveVoicingSelection(songId, chordName, index) {
 
 function getVoicingSelectionKey(songId, chordName) {
   return `${songId}::${chordName}`;
+}
+
+function loadPendingDelete() {
+  try {
+    const raw = localStorage.getItem(PENDING_DELETE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.song || !parsed?.expiresAt) {
+      return null;
+    }
+
+    if (parsed.expiresAt <= Date.now()) {
+      localStorage.removeItem(PENDING_DELETE_KEY);
+      return null;
+    }
+
+    return {
+      ...parsed,
+      song: {
+        ...parsed.song,
+        content: normalizeLineEndings(parsed.song.content || ""),
+      },
+    };
+  } catch (error) {
+    console.error("Unable to load pending delete", error);
+    return null;
+  }
+}
+
+function savePendingDelete() {
+  if (!state.pendingDelete) {
+    localStorage.removeItem(PENDING_DELETE_KEY);
+    return;
+  }
+
+  localStorage.setItem(PENDING_DELETE_KEY, JSON.stringify(state.pendingDelete));
+}
+
+function loadChordVoicingSelections() {
+  try {
+    const raw = localStorage.getItem(CHORD_VOICING_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (error) {
+    console.error("Unable to load chord voicing selections", error);
+    return {};
+  }
+}
+
+function saveChordVoicingSelections() {
+  localStorage.setItem(
+    CHORD_VOICING_KEY,
+    JSON.stringify(state.chordVoicingSelections),
+  );
 }

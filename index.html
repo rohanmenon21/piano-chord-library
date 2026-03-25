@@ -13,7 +13,68 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="page-shell">
+    <section id="loading-screen" class="loading-screen">
+      <div class="loading-card">
+        <p class="eyebrow">Connecting</p>
+        <h1>Piano Chord Library</h1>
+        <p id="loading-message" class="loading-copy">Loading your hosted workspace...</p>
+      </div>
+    </section>
+
+    <section id="auth-shell" class="auth-shell" hidden>
+      <div class="auth-card">
+        <div class="brand">
+          <p class="eyebrow">Hosted Library</p>
+          <h1>Piano Chord Library</h1>
+          <p class="brand-copy">
+            Sign in to access your private song library, chord previews, imports,
+            and saved transpositions across devices.
+          </p>
+        </div>
+
+        <div class="auth-header">
+          <h2 id="auth-title">Sign In</h2>
+          <p id="auth-subtitle" class="auth-subtitle">
+            Use your email and password to open your song library.
+          </p>
+        </div>
+
+        <form id="auth-form" class="auth-form">
+          <label id="auth-display-name-field" class="field" hidden>
+            <span>Display Name</span>
+            <input id="auth-display-name" type="text" autocomplete="name" />
+          </label>
+
+          <label class="field">
+            <span>Email</span>
+            <input id="auth-email" type="email" autocomplete="email" required />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input
+              id="auth-password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+
+          <div class="auth-actions">
+            <button id="auth-submit" class="primary-button" type="submit">
+              Sign In
+            </button>
+            <button id="auth-toggle" class="ghost-button" type="button">
+              Need an account?
+            </button>
+          </div>
+        </form>
+
+        <p id="auth-status" class="auth-status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <div id="app-shell" class="page-shell" hidden>
       <aside class="sidebar">
         <div class="brand">
           <p class="eyebrow">Chord Organizer</p>
@@ -45,6 +106,19 @@
       </aside>
 
       <main class="main-content">
+        <header class="app-header">
+          <div>
+            <p class="eyebrow">Signed In</p>
+            <h2 id="library-heading">Your Library</h2>
+            <p id="library-subtitle" class="header-copy">
+              Your songs are private to your account.
+            </p>
+          </div>
+          <button id="profile-button" class="ghost-button" type="button">
+            Profile
+          </button>
+        </header>
+
         <section class="workspace-card">
           <div class="mode-tabs" role="tablist" aria-label="Song workspace mode">
             <button
@@ -124,7 +198,6 @@
                   name="content"
                   rows="16"
                   placeholder="Paste your song here with chords above the lyrics"
-                  required
                 ></textarea>
               </label>
 
@@ -200,6 +273,44 @@
         </section>
       </main>
     </div>
+
+    <section id="profile-screen" class="profile-screen" hidden>
+      <div class="profile-card">
+        <div class="profile-header">
+          <div>
+            <p class="eyebrow">User Profile</p>
+            <h2>Your Account</h2>
+            <p class="header-copy">
+              Manage the profile attached to your private song library.
+            </p>
+          </div>
+          <button id="profile-close" class="ghost-button" type="button">
+            Back
+          </button>
+        </div>
+
+        <form id="profile-form" class="song-form">
+          <label class="field">
+            <span>Display Name</span>
+            <input id="profile-display-name" type="text" autocomplete="name" />
+          </label>
+
+          <label class="field">
+            <span>Email</span>
+            <input id="profile-email" type="email" readonly />
+          </label>
+
+          <div class="profile-actions">
+            <button class="primary-button" type="submit">Save Profile</button>
+            <button id="sign-out-button" class="ghost-button" type="button">
+              Sign Out
+            </button>
+          </div>
+        </form>
+
+        <p id="profile-status" class="auth-status" aria-live="polite"></p>
+      </div>
+    </section>
 
     <div id="undo-toast" class="undo-toast" hidden>
       <span id="undo-message">Song deleted</span>

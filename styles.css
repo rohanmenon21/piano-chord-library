@@ -19,6 +19,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -28,6 +32,10 @@ body {
     radial-gradient(circle at top left, rgba(255, 232, 199, 0.9), transparent 32%),
     radial-gradient(circle at bottom right, rgba(225, 169, 108, 0.22), transparent 28%),
     linear-gradient(135deg, #f6efe4 0%, #f0e3cf 100%);
+}
+
+body.modal-open {
+  overflow: hidden;
 }
 
 button,
@@ -42,6 +50,64 @@ select {
   grid-template-columns: 320px minmax(0, 1fr);
   gap: 24px;
   padding: 24px;
+}
+
+.loading-screen,
+.auth-shell,
+.profile-screen {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.loading-screen,
+.auth-shell {
+  display: grid;
+  place-items: center;
+}
+
+.loading-card,
+.auth-card,
+.profile-card {
+  width: min(100%, 560px);
+  padding: 32px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+}
+
+.loading-copy,
+.auth-subtitle,
+.header-copy {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.auth-actions,
+.profile-actions,
+.app-header,
+.profile-header {
+  display: flex;
+  gap: 12px;
+}
+
+.auth-actions,
+.profile-actions {
+  align-items: center;
+}
+
+.auth-status {
+  min-height: 1.2rem;
+  color: var(--muted);
+  margin: 16px 0 0;
 }
 
 .sidebar,
@@ -209,6 +275,12 @@ select {
   min-width: 0;
 }
 
+.app-header {
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
 .workspace-card {
   border-radius: var(--radius-xl);
   padding: 24px;
@@ -313,6 +385,20 @@ select {
   color: var(--muted);
   font-size: 0.92rem;
   min-height: 1.2rem;
+}
+
+.profile-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 20, 10, 0.32);
+  backdrop-filter: blur(6px);
+}
+
+.profile-card {
+  width: min(100%, 640px);
 }
 
 .transpose-panel {
@@ -585,6 +671,12 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .app-header,
+  .profile-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .transpose-panel,
   .song-list-header,
   .viewer-header {
@@ -594,6 +686,12 @@ select {
 
 @media (max-width: 720px) {
   .page-shell {
+    padding: 16px;
+  }
+
+  .auth-shell,
+  .loading-screen,
+  .profile-screen {
     padding: 16px;
   }
 
@@ -625,6 +723,12 @@ select {
   }
 
   .tooltip-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .auth-actions,
+  .profile-actions {
     flex-direction: column;
     align-items: stretch;
   }
