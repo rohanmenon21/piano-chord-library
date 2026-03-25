@@ -500,6 +500,7 @@ select {
   color: #f8e8d8;
   padding: 20px;
   overflow: auto;
+  height: min(72vh, 900px);
   min-height: 60vh;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.96rem;
@@ -762,6 +763,11 @@ select {
     right: 16px;
     bottom: 16px;
     justify-content: space-between;
+  }
+
+  .song-preview {
+    height: 62vh;
+    min-height: 52vh;
   }
 
   .tooltip-header {
