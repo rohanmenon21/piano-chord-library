@@ -3,6 +3,8 @@ const CHORD_VOICING_KEY = "piano-chord-library-chord-voicings-v1";
 const UNDO_WINDOW_MS = 5000;
 const AUTOSAVE_MS = 700;
 const DEFAULT_SORT_MODE = "last_viewed";
+const DEFAULT_AUTO_SCROLL_SPEED = 0.5;
+const MAX_AUTO_SCROLL_PIXELS_PER_SECOND = 140;
 const IMPORT_PROXIES = [
   (url) => url,
   (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//, "")}`,
@@ -96,6 +98,10 @@ const state = {
   selectedSongId: null,
   searchTerm: "",
   sortMode: DEFAULT_SORT_MODE,
+  autoScrollSpeed: DEFAULT_AUTO_SCROLL_SPEED,
+  autoScrollStatus: "idle",
+  autoScrollFrame: null,
+  autoScrollLastTimestamp: null,
   saveStatusTimer: null,
   autosaveTimer: null,
   activeTab: "edit",
@@ -168,6 +174,9 @@ const elements = {
   savedKeyLabel: document.querySelector("#saved-key-label"),
   transposeStatus: document.querySelector("#transpose-status"),
   preview: document.querySelector("#song-preview"),
+  autoScrollSpeed: document.querySelector("#auto-scroll-speed"),
+  autoScrollToggle: document.querySelector("#auto-scroll-toggle"),
+  autoScrollStatus: document.querySelector("#auto-scroll-status"),
   chordTooltip: document.querySelector("#chord-tooltip"),
   tooltipChordName: document.querySelector("#tooltip-chord-name"),
   tooltipChordNotes: document.querySelector("#tooltip-chord-notes"),
@@ -264,6 +273,10 @@ function bindEvents() {
   elements.resetTranspose.addEventListener("click", () => {
     void resetTranspose();
   });
+  elements.autoScrollSpeed.addEventListener("change", (event) => {
+    handleAutoScrollSpeedChange(event.target.value);
+  });
+  elements.autoScrollToggle.addEventListener("click", toggleAutoScroll);
   elements.preview.addEventListener("mouseover", handlePreviewMouseOver);
   elements.preview.addEventListener("mousemove", handlePreviewMouseMove);
   elements.preview.addEventListener("mouseleave", scheduleHideChordTooltip);
@@ -807,10 +820,12 @@ async function deleteSelectedSong() {
 
 function render() {
   elements.songSort.value = state.sortMode;
+  elements.autoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   renderTabs();
   renderSongList();
   renderSelectedSong();
   renderUndoToast();
+  renderAutoScrollControls();
 }
 
 function renderTabs() {
@@ -868,6 +883,7 @@ function renderSelectedSong() {
   const selectedSong = getSelectedSong();
   if (!selectedSong) {
     elements.preview.textContent = "No song selected yet.";
+    resetAutoScroll();
     return;
   }
 
@@ -894,6 +910,7 @@ function fillForm(song) {
 }
 
 function updatePreview(song) {
+  resetAutoScroll();
   const displayedKey = song.savedKey || transposeKey(song.originalKey, song.savedTranspose);
 
   elements.previewTitle.textContent = song.title || "Untitled Song";
@@ -932,6 +949,9 @@ function syncDraftPreview() {
 }
 
 function switchTab(tab) {
+  if (tab !== "preview") {
+    stopAutoScroll({ reset: true });
+  }
   state.activeTab = tab;
   renderTabs();
   if (tab !== "preview") {
@@ -1529,6 +1549,7 @@ async function savePreferredSortMode() {
 
 async function selectSong(songId, { tab = state.activeTab, trackView = true } = {}) {
   clearAutosaveTimer();
+  stopAutoScroll({ reset: true });
   state.selectedSongId = songId;
   state.activeTab = tab;
   render();
@@ -1572,6 +1593,131 @@ async function markSongViewed(songId, { rerender = true } = {}) {
   } catch (error) {
     console.error(error);
   }
+}
+
+function handleAutoScrollSpeedChange(value) {
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    return;
+  }
+
+  state.autoScrollSpeed = Math.max(0, Math.min(1, parsed));
+  renderAutoScrollControls();
+}
+
+function toggleAutoScroll() {
+  if (state.activeTab !== "preview") {
+    return;
+  }
+
+  if (state.autoScrollStatus === "running") {
+    pauseAutoScroll();
+    return;
+  }
+
+  if (state.autoScrollStatus === "paused") {
+    startAutoScroll();
+    return;
+  }
+
+  startAutoScroll();
+}
+
+function startAutoScroll() {
+  if (state.autoScrollSpeed <= 0) {
+    state.autoScrollStatus = "idle";
+    state.autoScrollLastTimestamp = null;
+    renderAutoScrollControls();
+    return;
+  }
+
+  const maxScrollTop = elements.preview.scrollHeight - elements.preview.clientHeight;
+  if (maxScrollTop <= 0 || elements.preview.scrollTop >= maxScrollTop) {
+    state.autoScrollStatus = "idle";
+    state.autoScrollLastTimestamp = null;
+    renderAutoScrollControls();
+    return;
+  }
+
+  cancelAutoScrollFrame();
+  state.autoScrollStatus = "running";
+  state.autoScrollLastTimestamp = null;
+  renderAutoScrollControls();
+  state.autoScrollFrame = window.requestAnimationFrame(runAutoScrollFrame);
+}
+
+function pauseAutoScroll() {
+  cancelAutoScrollFrame();
+  state.autoScrollStatus = "paused";
+  state.autoScrollLastTimestamp = null;
+  renderAutoScrollControls();
+}
+
+function stopAutoScroll({ reset = false } = {}) {
+  cancelAutoScrollFrame();
+  state.autoScrollStatus = "idle";
+  state.autoScrollLastTimestamp = null;
+  if (reset) {
+    renderAutoScrollControls();
+  }
+}
+
+function resetAutoScroll() {
+  stopAutoScroll({ reset: false });
+  renderAutoScrollControls();
+}
+
+function cancelAutoScrollFrame() {
+  if (state.autoScrollFrame) {
+    window.cancelAnimationFrame(state.autoScrollFrame);
+    state.autoScrollFrame = null;
+  }
+}
+
+function runAutoScrollFrame(timestamp) {
+  if (state.autoScrollStatus !== "running") {
+    return;
+  }
+
+  if (state.autoScrollLastTimestamp == null) {
+    state.autoScrollLastTimestamp = timestamp;
+  }
+
+  const elapsedMs = timestamp - state.autoScrollLastTimestamp;
+  state.autoScrollLastTimestamp = timestamp;
+
+  const pixelsPerSecond = state.autoScrollSpeed * MAX_AUTO_SCROLL_PIXELS_PER_SECOND;
+  const deltaPixels = (pixelsPerSecond * elapsedMs) / 1000;
+  const maxScrollTop = elements.preview.scrollHeight - elements.preview.clientHeight;
+  const nextScrollTop = Math.min(maxScrollTop, elements.preview.scrollTop + deltaPixels);
+  elements.preview.scrollTop = nextScrollTop;
+
+  if (nextScrollTop >= maxScrollTop) {
+    stopAutoScroll({ reset: false });
+    renderAutoScrollControls();
+    return;
+  }
+
+  state.autoScrollFrame = window.requestAnimationFrame(runAutoScrollFrame);
+}
+
+function renderAutoScrollControls() {
+  if (state.autoScrollStatus === "running") {
+    elements.autoScrollToggle.textContent = "Pause";
+    elements.autoScrollStatus.textContent = `Scrolling at ${state.autoScrollSpeed.toFixed(1)}`;
+    return;
+  }
+
+  if (state.autoScrollStatus === "paused") {
+    elements.autoScrollToggle.textContent = "Resume";
+    elements.autoScrollStatus.textContent = `Paused at ${state.autoScrollSpeed.toFixed(1)}`;
+    return;
+  }
+
+  elements.autoScrollToggle.textContent = "Start";
+  elements.autoScrollStatus.textContent = state.autoScrollSpeed <= 0
+    ? "Speed is 0.0"
+    : "Ready";
 }
 
 function setSaveStatus(message) {
