@@ -190,6 +190,12 @@ select {
   flex: 1;
 }
 
+.setlist-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .song-list-header,
 .viewer-header,
 .preview-meta,
@@ -258,6 +264,32 @@ select {
 .song-list-item.active {
   border-color: rgba(198, 102, 47, 0.4);
   background: rgba(255, 241, 225, 0.95);
+}
+
+.setlist-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  background: rgba(255, 250, 242, 0.88);
+  cursor: pointer;
+}
+
+.setlist-item.active {
+  border-color: rgba(198, 102, 47, 0.4);
+  background: rgba(255, 241, 225, 0.95);
+}
+
+.setlist-item strong,
+.setlist-item span {
+  display: block;
+}
+
+.setlist-item span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .song-list-item strong,
@@ -364,6 +396,55 @@ select {
   text-align: right;
 }
 
+.setlist-editor {
+  margin-bottom: 28px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 247, 236, 0.88);
+}
+
+.setlist-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.setlist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setlist-editor-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 250, 242, 0.92);
+}
+
+.setlist-item-meta strong,
+.setlist-item-meta span {
+  display: block;
+}
+
+.setlist-item-meta span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.setlist-item-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .field span {
   margin-bottom: 8px;
   font-weight: 500;
@@ -407,6 +488,68 @@ select {
 
 .profile-card {
   width: min(100%, 640px);
+}
+
+.performance-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 223, 182, 0.18), transparent 28%),
+    linear-gradient(180deg, #24160d 0%, #140d08 100%);
+  color: #f8e8d8;
+}
+
+.performance-toolbar,
+.performance-controls,
+.performance-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.performance-toolbar,
+.performance-controls {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.performance-actions {
+  align-items: center;
+}
+
+.performance-title-group h2 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+}
+
+.performance-screen .eyebrow,
+.performance-screen .header-copy {
+  color: rgba(248, 232, 216, 0.72);
+}
+
+.performance-preview {
+  margin: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 209, 159, 0.16);
+  background: rgba(42, 28, 16, 0.82);
+  color: #fff4e8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(1.15rem, 2vw, 1.5rem);
+  line-height: 1.75;
+}
+
+.performance-preview .chord-token {
+  color: #ffd19f;
+  font-weight: 700;
 }
 
 .transpose-panel {
@@ -745,9 +888,13 @@ select {
   .field-row,
   .form-actions,
   .import-row,
+  .setlist-add-row,
   .import-header,
   .transpose-controls,
   .auto-scroll-controls,
+  .performance-toolbar,
+  .performance-controls,
+  .performance-actions,
   .key-badges,
   .preview-meta {
     flex-direction: column;
@@ -768,6 +915,14 @@ select {
   .song-preview {
     height: 62vh;
     min-height: 52vh;
+  }
+
+  .setlist-editor-item {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-screen {
+    padding: 16px;
   }
 
   .tooltip-header {

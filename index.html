@@ -111,6 +111,17 @@
           />
           <div id="song-list" class="song-list" aria-live="polite"></div>
         </section>
+
+        <section class="setlist-panel">
+          <div class="song-list-header">
+            <h2>Setlists</h2>
+            <span id="setlist-count" class="pill">0</span>
+          </div>
+          <button id="new-setlist-button" class="ghost-button" type="button">
+            New Setlist
+          </button>
+          <div id="setlist-list" class="song-list" aria-live="polite"></div>
+        </section>
       </aside>
 
       <main class="main-content">
@@ -152,6 +163,42 @@
           </div>
 
           <section id="edit-panel" class="tab-panel active" role="tabpanel">
+            <section id="setlist-editor" class="setlist-editor" hidden>
+              <div class="section-heading">
+                <p class="eyebrow">Setlist Builder</p>
+                <h2 id="setlist-title">Select a setlist</h2>
+              </div>
+
+              <form id="setlist-form" class="song-form">
+                <label class="field">
+                  <span>Setlist Name</span>
+                  <input id="setlist-name" type="text" />
+                </label>
+
+                <div class="setlist-add-row">
+                  <label class="field">
+                    <span>Add Song</span>
+                    <select id="setlist-song-select"></select>
+                  </label>
+                  <button id="add-setlist-song-button" class="primary-button" type="button">
+                    Add Song
+                  </button>
+                </div>
+
+                <div id="setlist-items" class="setlist-items"></div>
+
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">Save Setlist</button>
+                  <span id="setlist-save-status" class="save-status" aria-live="polite">
+                    Saved
+                  </span>
+                  <button id="delete-setlist-button" class="ghost-button" type="button">
+                    Delete Setlist
+                  </button>
+                </div>
+              </form>
+            </section>
+
             <div class="section-heading">
               <p class="eyebrow">Song Details</p>
               <h2>Edit Song</h2>
@@ -249,6 +296,9 @@
                   <button id="reset-transpose" class="ghost-button" type="button">
                     Reset
                   </button>
+                  <button id="performance-mode-button" class="primary-button" type="button">
+                    Performance Mode
+                  </button>
                 </div>
 
                 <div class="auto-scroll-controls" aria-label="Auto scroll controls">
@@ -342,6 +392,75 @@
 
         <p id="profile-status" class="auth-status" aria-live="polite"></p>
       </div>
+    </section>
+
+    <section id="performance-screen" class="performance-screen" hidden>
+      <div class="performance-toolbar">
+        <div class="performance-title-group">
+          <p id="performance-context" class="eyebrow">Performance Mode</p>
+          <h2 id="performance-title">Untitled Song</h2>
+          <p id="performance-artist" class="header-copy">Unknown artist</p>
+        </div>
+        <div class="performance-actions">
+          <button id="performance-prev" class="ghost-button" type="button">
+            Previous
+          </button>
+          <button id="performance-next" class="ghost-button" type="button">
+            Next
+          </button>
+          <button id="performance-close" class="primary-button" type="button">
+            Exit
+          </button>
+        </div>
+      </div>
+
+      <div class="performance-controls">
+        <div class="key-badges">
+          <span class="badge">
+            Original: <strong id="performance-original-key">-</strong>
+          </span>
+          <span class="badge">
+            Saved transpose: <strong id="performance-saved-key">-</strong>
+          </span>
+        </div>
+        <div class="transpose-controls">
+          <button id="performance-transpose-down" class="ghost-button" type="button">
+            - Semitone
+          </button>
+          <span id="performance-transpose-status" class="transpose-status">0</span>
+          <button id="performance-transpose-up" class="ghost-button" type="button">
+            + Semitone
+          </button>
+          <button id="performance-reset-transpose" class="ghost-button" type="button">
+            Reset
+          </button>
+        </div>
+        <div class="auto-scroll-controls" aria-label="Performance auto scroll controls">
+          <label class="field auto-scroll-field">
+            <span>Speed</span>
+            <select id="performance-auto-scroll-speed" aria-label="Performance auto scroll speed">
+              <option value="0.1">0.1</option>
+              <option value="0.2">0.2</option>
+              <option value="0.3">0.3</option>
+              <option value="0.4">0.4</option>
+              <option value="0.5">0.5</option>
+              <option value="0.6">0.6</option>
+              <option value="0.7">0.7</option>
+              <option value="0.8">0.8</option>
+              <option value="0.9">0.9</option>
+              <option value="1.0">1.0</option>
+            </select>
+          </label>
+          <button id="performance-auto-scroll-toggle" class="primary-button" type="button">
+            Start
+          </button>
+          <span id="performance-auto-scroll-status" class="auto-scroll-status" aria-live="polite">
+            Ready
+          </span>
+        </div>
+      </div>
+
+      <pre id="performance-preview" class="performance-preview"></pre>
     </section>
 
     <div id="undo-toast" class="undo-toast" hidden>
