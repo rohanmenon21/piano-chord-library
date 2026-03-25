@@ -3,8 +3,12 @@ const CHORD_VOICING_KEY = "piano-chord-library-chord-voicings-v1";
 const UNDO_WINDOW_MS = 5000;
 const AUTOSAVE_MS = 700;
 const DEFAULT_SORT_MODE = "last_viewed";
-const DEFAULT_AUTO_SCROLL_SPEED = 0.5;
+const DEFAULT_AUTO_SCROLL_SPEED = 0.1;
 const MAX_AUTO_SCROLL_PIXELS_PER_SECOND = 140;
+const AUTO_SCROLL_MIN_VISIBLE_SPEED = 0.1;
+const AUTO_SCROLL_MAX_VISIBLE_SPEED = 1.0;
+const AUTO_SCROLL_MIN_MAPPED_SPEED = 0.5;
+const AUTO_SCROLL_MAX_MAPPED_SPEED = 0.7;
 const IMPORT_PROXIES = [
   (url) => url,
   (url) => `https://r.jina.ai/http://${url.replace(/^https?:\/\//, "")}`,
@@ -1601,7 +1605,10 @@ function handleAutoScrollSpeedChange(value) {
     return;
   }
 
-  state.autoScrollSpeed = Math.max(0, Math.min(1, parsed));
+  state.autoScrollSpeed = Math.max(
+    AUTO_SCROLL_MIN_VISIBLE_SPEED,
+    Math.min(AUTO_SCROLL_MAX_VISIBLE_SPEED, parsed),
+  );
   renderAutoScrollControls();
 }
 
@@ -1624,13 +1631,6 @@ function toggleAutoScroll() {
 }
 
 function startAutoScroll() {
-  if (state.autoScrollSpeed <= 0) {
-    state.autoScrollStatus = "idle";
-    state.autoScrollLastTimestamp = null;
-    renderAutoScrollControls();
-    return;
-  }
-
   const maxScrollTop = elements.preview.scrollHeight - elements.preview.clientHeight;
   if (maxScrollTop <= 0 || elements.preview.scrollTop >= maxScrollTop) {
     state.autoScrollStatus = "idle";
@@ -1686,7 +1686,8 @@ function runAutoScrollFrame(timestamp) {
   const elapsedMs = timestamp - state.autoScrollLastTimestamp;
   state.autoScrollLastTimestamp = timestamp;
 
-  const pixelsPerSecond = state.autoScrollSpeed * MAX_AUTO_SCROLL_PIXELS_PER_SECOND;
+  const pixelsPerSecond =
+    getMappedAutoScrollSpeed(state.autoScrollSpeed) * MAX_AUTO_SCROLL_PIXELS_PER_SECOND;
   const deltaPixels = (pixelsPerSecond * elapsedMs) / 1000;
   const maxScrollTop = elements.preview.scrollHeight - elements.preview.clientHeight;
   const nextScrollTop = Math.min(maxScrollTop, elements.preview.scrollTop + deltaPixels);
@@ -1715,9 +1716,15 @@ function renderAutoScrollControls() {
   }
 
   elements.autoScrollToggle.textContent = "Start";
-  elements.autoScrollStatus.textContent = state.autoScrollSpeed <= 0
-    ? "Speed is 0.0"
-    : "Ready";
+  elements.autoScrollStatus.textContent = "Ready";
+}
+
+function getMappedAutoScrollSpeed(visibleSpeed) {
+  const normalized =
+    (visibleSpeed - AUTO_SCROLL_MIN_VISIBLE_SPEED) /
+    (AUTO_SCROLL_MAX_VISIBLE_SPEED - AUTO_SCROLL_MIN_VISIBLE_SPEED);
+  return AUTO_SCROLL_MIN_MAPPED_SPEED +
+    normalized * (AUTO_SCROLL_MAX_MAPPED_SPEED - AUTO_SCROLL_MIN_MAPPED_SPEED);
 }
 
 function setSaveStatus(message) {
