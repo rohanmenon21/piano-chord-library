@@ -161,6 +161,8 @@ const elements = {
   librarySubtitle: document.querySelector("#library-subtitle"),
   songsWorkspaceTab: document.querySelector("#songs-workspace-tab"),
   setlistsWorkspaceTab: document.querySelector("#setlists-workspace-tab"),
+  songsSidebarPanel: document.querySelector("#songs-sidebar-panel"),
+  setlistsSidebarPanel: document.querySelector("#setlists-sidebar-panel"),
   songsWorkspace: document.querySelector("#songs-workspace"),
   setlistsWorkspace: document.querySelector("#setlists-workspace"),
   songList: document.querySelector("#song-list"),
@@ -1297,6 +1299,10 @@ function renderWorkspaceTabs() {
   elements.setlistsWorkspaceTab.classList.toggle("active", !isSongs);
   elements.songsWorkspaceTab.setAttribute("aria-selected", String(isSongs));
   elements.setlistsWorkspaceTab.setAttribute("aria-selected", String(!isSongs));
+  elements.songsSidebarPanel.classList.toggle("active", isSongs);
+  elements.setlistsSidebarPanel.classList.toggle("active", !isSongs);
+  elements.songsSidebarPanel.hidden = !isSongs;
+  elements.setlistsSidebarPanel.hidden = isSongs;
 }
 
 function renderWorkspacePanels() {

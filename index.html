@@ -85,31 +85,69 @@
           </p>
         </div>
 
-        <button id="new-song-button" class="primary-button" type="button">
-          New Song
-        </button>
+        <div class="sidebar-tabs" role="tablist" aria-label="Library sections">
+          <button
+            id="songs-workspace-tab"
+            class="tab-button active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="songs-sidebar-panel"
+          >
+            Songs
+          </button>
+          <button
+            id="setlists-workspace-tab"
+            class="tab-button"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="setlists-sidebar-panel"
+          >
+            Setlists
+          </button>
+        </div>
 
-        <section class="song-list-panel">
-          <div class="song-list-header">
-            <h2>Songs</h2>
-            <span id="song-count" class="pill">0</span>
-          </div>
-          <label class="field sort-field">
-            <span>Sort by</span>
-            <select id="song-sort" aria-label="Sort songs">
-              <option value="last_viewed">Most Recent Viewed</option>
-              <option value="title">Song Name</option>
-              <option value="artist">Artist Name</option>
-            </select>
-          </label>
-          <input
-            id="song-search"
-            class="search-input"
-            type="search"
-            placeholder="Search songs"
-            aria-label="Search songs"
-          />
-          <div id="song-list" class="song-list" aria-live="polite"></div>
+        <section id="songs-sidebar-panel" class="sidebar-panel active" role="tabpanel">
+          <button id="new-song-button" class="primary-button" type="button">
+            New Song
+          </button>
+
+          <section class="song-list-panel">
+            <div class="song-list-header">
+              <h2>Songs</h2>
+              <span id="song-count" class="pill">0</span>
+            </div>
+            <label class="field sort-field">
+              <span>Sort by</span>
+              <select id="song-sort" aria-label="Sort songs">
+                <option value="last_viewed">Most Recent Viewed</option>
+                <option value="title">Song Name</option>
+                <option value="artist">Artist Name</option>
+              </select>
+            </label>
+            <input
+              id="song-search"
+              class="search-input"
+              type="search"
+              placeholder="Search songs"
+              aria-label="Search songs"
+            />
+            <div id="song-list" class="song-list" aria-live="polite"></div>
+          </section>
+        </section>
+
+        <section id="setlists-sidebar-panel" class="sidebar-panel" role="tabpanel" hidden>
+          <section class="setlists-browser">
+            <div class="song-list-header">
+              <h2>Setlists</h2>
+              <span id="setlist-count" class="pill">0</span>
+            </div>
+            <button id="new-setlist-button" class="primary-button" type="button">
+              New Setlist
+            </button>
+            <div id="setlist-list" class="song-list" aria-live="polite"></div>
+          </section>
         </section>
 
       </aside>
@@ -134,29 +172,6 @@
         </header>
 
         <section class="workspace-card">
-          <div class="workspace-tabs" role="tablist" aria-label="Library workspace">
-            <button
-              id="songs-workspace-tab"
-              class="tab-button active"
-              type="button"
-              role="tab"
-              aria-selected="true"
-              aria-controls="songs-workspace"
-            >
-              Songs
-            </button>
-            <button
-              id="setlists-workspace-tab"
-              class="tab-button"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              aria-controls="setlists-workspace"
-            >
-              Setlists
-            </button>
-          </div>
-
           <section id="songs-workspace" class="workspace-view active" role="tabpanel">
             <div class="mode-tabs" role="tablist" aria-label="Song workspace mode">
               <button
@@ -321,17 +336,6 @@
 
           <section id="setlists-workspace" class="workspace-view" role="tabpanel" hidden>
             <div class="setlists-layout">
-              <section class="setlists-browser">
-                <div class="song-list-header">
-                  <h2>Setlists</h2>
-                  <span id="setlist-count" class="pill">0</span>
-                </div>
-                <button id="new-setlist-button" class="primary-button" type="button">
-                  New Setlist
-                </button>
-                <div id="setlist-list" class="song-list" aria-live="polite"></div>
-              </section>
-
               <section class="setlists-detail">
                 <section id="setlist-editor" class="setlist-editor">
                   <div class="section-heading">

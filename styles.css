@@ -134,6 +134,38 @@ select {
   border-radius: var(--radius-xl);
 }
 
+.sidebar-tabs,
+.workspace-tabs,
+.mode-tabs {
+  display: inline-flex;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(255, 245, 232, 0.9);
+  border: 1px solid var(--line);
+}
+
+.sidebar-tabs {
+  width: 100%;
+}
+
+.sidebar-tabs .tab-button {
+  flex: 1;
+}
+
+.sidebar-panel {
+  display: none;
+  min-height: 0;
+}
+
+.sidebar-panel.active {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  flex: 1;
+}
+
 .brand h1,
 .section-heading h2 {
   margin: 0;
@@ -326,14 +358,7 @@ select {
   padding: 24px;
 }
 
-.workspace-tabs,
 .mode-tabs {
-  display: inline-flex;
-  gap: 10px;
-  padding: 6px;
-  border-radius: 999px;
-  background: rgba(255, 245, 232, 0.9);
-  border: 1px solid var(--line);
   margin-bottom: 24px;
 }
 
@@ -421,21 +446,13 @@ select {
   background: rgba(255, 247, 236, 0.88);
 }
 
-.setlists-layout {
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 24px;
-}
-
-.setlists-browser,
+.setlists-layout,
 .setlists-detail {
   min-width: 0;
 }
 
-.setlists-browser {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.setlists-layout {
+  display: block;
 }
 
 .setlists-detail {
@@ -1001,10 +1018,6 @@ select {
     align-items: stretch;
   }
 
-  .setlists-layout {
-    grid-template-columns: 1fr;
-  }
-
   .transpose-panel,
   .song-list-header,
   .viewer-header {
@@ -1046,10 +1059,6 @@ select {
   }
 
   .mode-tabs {
-    display: flex;
-  }
-
-  .workspace-tabs {
     display: flex;
   }
 
