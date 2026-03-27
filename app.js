@@ -1718,6 +1718,9 @@ function switchWorkspaceMode(mode) {
 
   stopAutoScroll({ reset: true });
   hideChordTooltip();
+  if (mode === "setlists") {
+    state.setlistActiveTab = "preview";
+  }
   state.workspaceMode = mode;
   render();
 }
