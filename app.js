@@ -130,8 +130,14 @@ const state = {
   pendingDelete: loadPendingDelete(),
   chordVoicingSelections: loadChordVoicingSelections(),
   undoTimer: null,
+  loadErrors: {
+    songs: null,
+    setlists: null,
+  },
+  overlayReturnFocus: null,
   performanceMode: {
     active: false,
+    context: null,
   },
 };
 
@@ -274,19 +280,24 @@ async function initialize() {
   setLoadingState("Loading hosted workspace...");
 
   try {
-    const config = await loadAppConfig();
-    const supabaseModule = await import("https://esm.sh/@supabase/supabase-js@2");
-    state.config = config;
-    state.supabase = supabaseModule.createClient(
-      config.supabaseUrl,
-      config.supabaseAnonKey,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
+    if (shouldUseMockMode()) {
+      state.config = { supabaseUrl: "mock", supabaseAnonKey: "mock" };
+      state.supabase = createMockSupabase();
+    } else {
+      const config = await loadAppConfig();
+      const supabaseModule = await import("https://esm.sh/@supabase/supabase-js@2");
+      state.config = config;
+      state.supabase = supabaseModule.createClient(
+        config.supabaseUrl,
+        config.supabaseAnonKey,
+        {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+          },
         },
-      },
-    );
+      );
+    }
 
     state.supabase.auth.onAuthStateChange((event, session) => {
       void handleSessionChange(session, event);
@@ -462,6 +473,406 @@ async function loadAppConfig() {
   return config;
 }
 
+function shouldUseMockMode() {
+  const params = new URLSearchParams(window.location.search);
+  return params.has("mock") || window.__APP_TEST_MODE__ === true;
+}
+
+function createMockSupabase() {
+  const state = createMockDatabase();
+  const authListeners = new Set();
+  let currentSession = {
+    user: state.users[0],
+  };
+
+  const emitAuthStateChange = (event) => {
+    for (const listener of authListeners) {
+      listener(event, currentSession);
+    }
+  };
+
+  const ensureMockUser = (email, displayName = "Mock User") => {
+    const normalizedEmail = email.toLowerCase();
+    let user = state.users.find((entry) => entry.email.toLowerCase() === normalizedEmail);
+    if (!user) {
+      user = {
+        id: `mock-user-${state.users.length + 1}`,
+        email,
+        user_metadata: { display_name: displayName },
+      };
+      state.users.push(user);
+    }
+
+    const existingProfile = state.profiles.find((profile) => profile.id === user.id);
+    if (!existingProfile) {
+      const now = new Date().toISOString();
+      state.profiles.push({
+        id: user.id,
+        display_name: displayName,
+        email,
+        preferred_song_sort: DEFAULT_SORT_MODE,
+        created_at: now,
+        updated_at: now,
+      });
+    }
+
+    return user;
+  };
+
+  const getTableRows = (tableName) => {
+    if (tableName === "profiles") {
+      return state.profiles;
+    }
+    return state.tables[tableName] || [];
+  };
+
+  const setTableRows = (tableName, rows) => {
+    if (tableName === "profiles") {
+      state.profiles = rows;
+      return;
+    }
+    state.tables[tableName] = rows;
+  };
+
+  const clone = (value) =>
+    typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+
+  class MockQueryBuilder {
+    constructor(tableName) {
+      this.tableName = tableName;
+      this.action = "select";
+      this.payload = null;
+      this.filters = [];
+      this.orders = [];
+      this.expectSingle = false;
+    }
+
+    select() {
+      return this;
+    }
+
+    insert(payload) {
+      this.action = "insert";
+      this.payload = payload;
+      return this;
+    }
+
+    update(payload) {
+      this.action = "update";
+      this.payload = payload;
+      return this;
+    }
+
+    delete() {
+      this.action = "delete";
+      return this;
+    }
+
+    upsert(payload) {
+      this.action = "upsert";
+      this.payload = payload;
+      return this;
+    }
+
+    eq(column, value) {
+      this.filters.push({ column, value });
+      return this;
+    }
+
+    order(column, options = {}) {
+      this.orders.push({
+        column,
+        ascending: options.ascending !== false,
+      });
+      return this;
+    }
+
+    single() {
+      this.expectSingle = true;
+      return this;
+    }
+
+    then(resolve, reject) {
+      return this.execute().then(resolve, reject);
+    }
+
+    async execute() {
+      try {
+        const data = this.run();
+        return { data, error: null };
+      } catch (error) {
+        return { data: null, error };
+      }
+    }
+
+    run() {
+      const now = new Date().toISOString();
+      const rows = getTableRows(this.tableName);
+      const matchesFilters = (row) =>
+        this.filters.every(({ column, value }) => String(row[column]) === String(value));
+
+      if (this.action === "select") {
+        let result = rows.filter(matchesFilters).map((row) => clone(row));
+        result = applyMockOrdering(result, this.orders);
+        return this.expectSingle ? expectSingleRow(result, this.tableName) : result;
+      }
+
+      if (this.action === "insert") {
+        const inputs = Array.isArray(this.payload) ? this.payload : [this.payload];
+        const inserted = inputs.map((input) => {
+          const record = clone(input);
+          if (!record.id) {
+            record.id = createMockId(this.tableName);
+          }
+          if (!record.created_at) {
+            record.created_at = now;
+          }
+          if (!record.updated_at) {
+            record.updated_at = now;
+          }
+          if (this.tableName === "profiles") {
+            record.display_name = record.display_name || "Piano Player";
+          }
+          rows.push(record);
+          return clone(record);
+        });
+        return this.expectSingle ? expectSingleRow(inserted, this.tableName) : inserted;
+      }
+
+      if (this.action === "update") {
+        const updated = [];
+        const nextRows = rows.map((row) => {
+          if (!matchesFilters(row)) {
+            return row;
+          }
+          const nextRow = {
+            ...row,
+            ...clone(this.payload),
+            updated_at: now,
+          };
+          updated.push(clone(nextRow));
+          return nextRow;
+        });
+        setTableRows(this.tableName, nextRows);
+        return this.expectSingle ? expectSingleRow(updated, this.tableName) : updated;
+      }
+
+      if (this.action === "delete") {
+        const keptRows = [];
+        const deleted = [];
+        for (const row of rows) {
+          if (matchesFilters(row)) {
+            deleted.push(clone(row));
+          } else {
+            keptRows.push(row);
+          }
+        }
+        setTableRows(this.tableName, keptRows);
+        return this.expectSingle ? expectSingleRow(deleted, this.tableName) : deleted;
+      }
+
+      if (this.action === "upsert") {
+        const inputs = Array.isArray(this.payload) ? this.payload : [this.payload];
+        const upserted = [];
+        for (const input of inputs) {
+          const record = clone(input);
+          if (!record.id) {
+            record.id = createMockId(this.tableName);
+          }
+          const index = rows.findIndex((row) => row.id === record.id);
+          const nextRecord = {
+            ...(index === -1 ? {} : rows[index]),
+            ...record,
+            created_at: record.created_at || rows[index]?.created_at || now,
+            updated_at: now,
+          };
+          if (index === -1) {
+            rows.push(nextRecord);
+          } else {
+            rows[index] = nextRecord;
+          }
+          upserted.push(clone(nextRecord));
+        }
+        return this.expectSingle ? expectSingleRow(upserted, this.tableName) : upserted;
+      }
+
+      throw new Error(`Unsupported mock operation: ${this.action}`);
+    }
+  }
+
+  return {
+    auth: {
+      onAuthStateChange(callback) {
+        authListeners.add(callback);
+        return {
+          data: {
+            subscription: {
+              unsubscribe() {
+                authListeners.delete(callback);
+              },
+            },
+          },
+        };
+      },
+      async getSession() {
+        return { data: { session: currentSession }, error: null };
+      },
+      async signUp({ email, options = {} }) {
+        const user = ensureMockUser(email, options.data?.display_name || "Mock User");
+        currentSession = { user };
+        emitAuthStateChange("SIGNED_IN");
+        return { data: { session: currentSession }, error: null };
+      },
+      async signInWithPassword({ email }) {
+        const user = ensureMockUser(email, email.split("@")[0] || "Mock User");
+        currentSession = { user };
+        emitAuthStateChange("SIGNED_IN");
+        return { data: { session: currentSession }, error: null };
+      },
+      async signOut() {
+        currentSession = null;
+        emitAuthStateChange("SIGNED_OUT");
+        return { error: null };
+      },
+    },
+    from(tableName) {
+      return new MockQueryBuilder(tableName);
+    },
+  };
+
+  function createMockDatabase() {
+    const now = Date.now();
+    const stamp = (msOffset) => new Date(now - msOffset).toISOString();
+
+    const users = [
+      {
+        id: "mock-user-1",
+        email: "demo@example.com",
+        user_metadata: { display_name: "Demo User" },
+      },
+    ];
+
+    return {
+      users,
+      profiles: [
+        {
+          id: "mock-user-1",
+          display_name: "Demo User",
+          email: "demo@example.com",
+          preferred_song_sort: DEFAULT_SORT_MODE,
+          created_at: stamp(5 * 60 * 1000),
+          updated_at: stamp(2 * 60 * 1000),
+        },
+      ],
+      tables: {
+        songs: [
+          {
+            id: "mock-song-1",
+            user_id: "mock-user-1",
+            title: "Demo Song",
+            artist: "Demo Artist",
+            original_key: "C",
+            saved_transpose: 0,
+            saved_key: "C",
+            content: "C\nDemo lyric line",
+            created_at: stamp(8 * 60 * 1000),
+            updated_at: stamp(3 * 60 * 1000),
+            last_viewed_at: stamp(90 * 1000),
+          },
+          {
+            id: "mock-song-2",
+            user_id: "mock-user-1",
+            title: "Second Song",
+            artist: "Another Artist",
+            original_key: "G",
+            saved_transpose: 0,
+            saved_key: "G",
+            content: "G\nSecond lyric line",
+            created_at: stamp(7 * 60 * 1000),
+            updated_at: stamp(4 * 60 * 1000),
+            last_viewed_at: stamp(4 * 60 * 1000),
+          },
+        ],
+        setlists: [
+          {
+            id: "mock-setlist-1",
+            user_id: "mock-user-1",
+            name: "Sunday Set",
+            created_at: stamp(6 * 60 * 1000),
+            updated_at: stamp(75 * 1000),
+          },
+          {
+            id: "mock-setlist-2",
+            user_id: "mock-user-1",
+            name: "Rehearsal Set",
+            created_at: stamp(5 * 60 * 1000),
+            updated_at: stamp(2 * 60 * 1000),
+          },
+        ],
+        setlist_items: [
+          {
+            id: "mock-item-1",
+            setlist_id: "mock-setlist-1",
+            song_id: "mock-song-1",
+            position: 0,
+            created_at: stamp(5 * 60 * 1000),
+          },
+          {
+            id: "mock-item-2",
+            setlist_id: "mock-setlist-1",
+            song_id: "mock-song-2",
+            position: 1,
+            created_at: stamp(4 * 60 * 1000),
+          },
+          {
+            id: "mock-item-3",
+            setlist_id: "mock-setlist-2",
+            song_id: "mock-song-2",
+            position: 0,
+            created_at: stamp(4 * 60 * 1000),
+          },
+        ],
+      },
+    };
+  }
+
+  function createMockId(tableName) {
+    return `${tableName.slice(0, -1)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function applyMockOrdering(rows, orders) {
+    if (!orders.length) {
+      return rows;
+    }
+
+    return rows.sort((left, right) => {
+      for (const { column, ascending } of orders) {
+        const leftValue = left[column] ?? "";
+        const rightValue = right[column] ?? "";
+        if (leftValue < rightValue) {
+          return ascending ? -1 : 1;
+        }
+        if (leftValue > rightValue) {
+          return ascending ? 1 : -1;
+        }
+      }
+      return 0;
+    });
+  }
+
+  function expectSingleRow(rows, tableName) {
+    if (rows.length === 1) {
+      return rows[0];
+    }
+
+    if (rows.length === 0) {
+      throw new Error(`No rows returned from mock ${tableName}`);
+    }
+
+    throw new Error(`Multiple rows returned from mock ${tableName}`);
+  }
+}
+
 async function handleSessionChange(session) {
   state.session = session;
   state.user = session?.user ?? null;
@@ -472,6 +883,8 @@ async function handleSessionChange(session) {
     state.profile = null;
     state.songs = [];
     state.setlists = [];
+    state.loadErrors.songs = null;
+    state.loadErrors.setlists = null;
     state.selectedSongId = null;
     state.selectedSetlistId = null;
     state.selectedSetlistItemId = null;
@@ -479,6 +892,7 @@ async function handleSessionChange(session) {
     state.workspaceMode = "songs";
     state.activeTab = "edit";
     state.setlistActiveTab = "preview";
+    state.performanceMode.context = null;
     closePerformanceMode();
     clearPendingDelete();
     showAuthScreen();
@@ -488,8 +902,25 @@ async function handleSessionChange(session) {
   setLoadingState("Loading your songs...");
   try {
     await ensureProfileForUser(session.user);
-    await loadSongsForCurrentUser();
-    await loadSetlistsForCurrentUser();
+    state.loadErrors.songs = null;
+    state.loadErrors.setlists = null;
+    const [songsResult, setlistsResult] = await Promise.allSettled([
+      loadSongsForCurrentUser(),
+      loadSetlistsForCurrentUser(),
+    ]);
+    state.loadErrors.songs = songsResult.status === "rejected" ? songsResult.reason : null;
+    state.loadErrors.setlists = setlistsResult.status === "rejected" ? setlistsResult.reason : null;
+    if (songsResult.status === "rejected") {
+      state.songs = [];
+      state.selectedSongId = null;
+      state.activeTab = "edit";
+    }
+    if (setlistsResult.status === "rejected") {
+      state.setlists = [];
+      state.selectedSetlistId = null;
+      state.selectedSetlistItemId = null;
+      state.expandedSetlistId = null;
+    }
     showAppScreen();
   } catch (error) {
     console.error(error);
@@ -547,13 +978,16 @@ function openHelpScreen() {
     return;
   }
 
+  captureOverlayFocus();
   elements.helpScreen.hidden = false;
   syncModalState();
+  focusAfterPaint(elements.helpClose);
 }
 
 function closeHelpScreen() {
   elements.helpScreen.hidden = true;
   syncModalState();
+  restoreOverlayFocus();
 }
 
 function openProfileScreen() {
@@ -561,14 +995,17 @@ function openProfileScreen() {
     return;
   }
 
+  captureOverlayFocus();
   updateProfileForm();
   elements.profileScreen.hidden = false;
   syncModalState();
+  focusAfterPaint(elements.profileClose);
 }
 
 function closeProfileScreen() {
   elements.profileScreen.hidden = true;
   syncModalState();
+  restoreOverlayFocus();
 }
 
 function toggleAuthMode() {
@@ -700,23 +1137,26 @@ async function handleProfileSubmit(event) {
   const displayName = elements.profileDisplayName.value.trim() || "Piano Player";
   elements.profileStatus.textContent = "Saving profile...";
 
-  const { data, error } = await state.supabase
-    .from("profiles")
-    .update({
-      display_name: displayName,
-    })
-    .eq("id", state.user.id)
-    .select("id, display_name, email, preferred_song_sort, created_at, updated_at")
-    .single();
+  try {
+    const { data, error } = await state.supabase
+      .from("profiles")
+      .update({
+        display_name: displayName,
+      })
+      .eq("id", state.user.id)
+      .select("id, display_name, email, preferred_song_sort, created_at, updated_at")
+      .single();
 
-  if (error) {
-    elements.profileStatus.textContent = error.message || "Unable to save profile.";
-    return;
+    if (error) {
+      throw error;
+    }
+
+    state.profile = data;
+    updateLibraryHeader();
+    elements.profileStatus.textContent = "Profile saved";
+  } catch (error) {
+    reportOperationError(error, elements.profileStatus, "Unable to save profile.");
   }
-
-  state.profile = data;
-  updateLibraryHeader();
-  elements.profileStatus.textContent = "Profile saved";
 }
 
 function updateProfileForm() {
@@ -891,6 +1331,35 @@ function createBlankSong() {
   elements.title.focus();
 }
 
+function clearSetlistWorkspaceState() {
+  state.selectedSetlistId = null;
+  state.selectedSetlistItemId = null;
+  state.expandedSetlistId = null;
+}
+
+function captureOverlayFocus() {
+  state.overlayReturnFocus =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
+}
+
+function restoreOverlayFocus() {
+  const nextFocus = state.overlayReturnFocus;
+  state.overlayReturnFocus = null;
+  if (nextFocus && document.contains(nextFocus)) {
+    nextFocus.focus();
+  }
+}
+
+function focusAfterPaint(element) {
+  if (!element) {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    element.focus();
+  });
+}
+
 function getSelectedSong() {
   return state.songs.find((song) => song.id === state.selectedSongId) ?? null;
 }
@@ -1016,8 +1485,7 @@ async function persistCurrentSong(message) {
     renderSongList();
     renderSelectedSong();
   } catch (error) {
-    console.error(error);
-    setSaveStatus(error.message || "Unable to save song");
+    reportOperationError(error, elements.saveStatus, "Unable to save song");
   }
 }
 
@@ -1053,7 +1521,7 @@ async function createSetlist() {
     selectSetlist(nextSetlist.id);
     elements.setlistName.focus();
   } catch (error) {
-    console.error(error);
+    reportOperationError(error, elements.setlistSaveStatus, "Unable to create setlist");
   }
 }
 
@@ -1113,8 +1581,7 @@ async function handleSetlistSave(event) {
     elements.setlistSaveStatus.textContent = "Saved";
     render();
   } catch (error) {
-    console.error(error);
-    elements.setlistSaveStatus.textContent = error.message || "Unable to save setlist";
+    reportOperationError(error, elements.setlistSaveStatus, "Unable to save setlist");
   }
 }
 
@@ -1151,8 +1618,7 @@ async function addSongToSelectedSetlist() {
     state.activeTab = "preview";
     render();
   } catch (error) {
-    console.error(error);
-    elements.setlistSaveStatus.textContent = error.message || "Unable to add song";
+    reportOperationError(error, elements.setlistSaveStatus, "Unable to add song");
   }
 }
 
@@ -1178,8 +1644,7 @@ async function deleteSelectedSetlist() {
     state.selectedSetlistItemId = null;
     render();
   } catch (error) {
-    console.error(error);
-    elements.setlistSaveStatus.textContent = error.message || "Unable to delete setlist";
+    reportOperationError(error, elements.setlistSaveStatus, "Unable to delete setlist");
   }
 }
 
@@ -1203,8 +1668,7 @@ async function removeSetlistItem(itemId) {
     state.selectedSongId = nextItems[0]?.songId || null;
     render();
   } catch (error) {
-    console.error(error);
-    elements.setlistSaveStatus.textContent = error.message || "Unable to remove song";
+    reportOperationError(error, elements.setlistSaveStatus, "Unable to remove song");
   }
 }
 
@@ -1382,6 +1846,16 @@ function renderSetlistTabs() {
 }
 
 function renderSongList() {
+  if (state.loadErrors.songs) {
+    elements.songCount.textContent = "0";
+    elements.songList.innerHTML = `
+      <div class="empty-state">
+        Unable to load songs right now. Refresh the page to try again.
+      </div>
+    `;
+    return;
+  }
+
   const filteredSongs = getRenderableSongs().filter((song) => {
     const haystack = `${song.title} ${song.artist}`.toLowerCase();
     return haystack.includes(state.searchTerm);
@@ -1423,6 +1897,16 @@ function getRenderableSongs() {
 }
 
 function renderSetlistList() {
+  if (state.loadErrors.setlists) {
+    elements.setlistCount.textContent = "0";
+    elements.setlistList.innerHTML = `
+      <div class="empty-state">
+        Unable to load setlists right now. Refresh the page to try again.
+      </div>
+    `;
+    return;
+  }
+
   const filteredSetlists = [...state.setlists]
     .sort(compareSetlistsForSortMode)
     .filter((setlist) =>
@@ -1452,6 +1936,7 @@ function renderSetlistList() {
                       type="button"
                       data-setlist-song-id="${item.songId}"
                       data-setlist-item-id="${item.id}"
+                      aria-current="${String(isActiveSong)}"
                     >
                       ${escapeHtml(song?.title || "Missing song")}
                     </button>
@@ -1468,6 +1953,7 @@ function renderSetlistList() {
             type="button"
             data-setlist-id="${setlist.id}"
             aria-expanded="${String(isExpanded)}"
+            aria-current="${String(setlist.id === state.selectedSetlistId)}"
           >
             <strong>${escapeHtml(setlist.name || "Untitled Setlist")}</strong>
             <span>${setlist.items.length} song${setlist.items.length === 1 ? "" : "s"}</span>
@@ -1761,6 +2247,7 @@ function switchWorkspaceMode(mode) {
   hideChordTooltip();
   if (mode === "songs") {
     state.activeTab = "preview";
+    clearSetlistWorkspaceState();
   }
   if (mode === "setlists") {
     state.setlistActiveTab = "preview";
@@ -1884,8 +2371,7 @@ async function importFromUrl() {
     renderSongList();
     setImportStatus("Imported successfully");
   } catch (error) {
-    console.error(error);
-    setImportStatus(error.message || "Import failed");
+    reportOperationError(error, elements.importStatus, "Import failed");
   } finally {
     elements.importButton.disabled = false;
   }
@@ -2273,6 +2759,13 @@ function setImportStatus(message) {
   elements.importStatus.textContent = message;
 }
 
+function reportOperationError(error, element, fallbackMessage) {
+  console.error(error);
+  if (element) {
+    element.textContent = error.message || fallbackMessage;
+  }
+}
+
 function applyFormToSong(song) {
   song.title = elements.title.value.trim() || "Untitled Song";
   song.artist = elements.artist.value.trim();
@@ -2365,8 +2858,7 @@ async function savePreferredSortMode() {
     .single();
 
   if (error) {
-    console.error(error);
-    elements.profileStatus.textContent = error.message || "Unable to save sort preference.";
+    reportOperationError(error, elements.profileStatus, "Unable to save sort preference.");
     return;
   }
 
@@ -2379,7 +2871,7 @@ async function selectSong(songId, { tab = state.activeTab, trackView = true } = 
   clearAutosaveTimer();
   stopAutoScroll({ reset: true });
   state.selectedSongId = songId;
-  if (state.selectedSetlistId) {
+  if (state.workspaceMode === "setlists" && state.selectedSetlistId) {
     const selectedSetlist = getSelectedSetlist();
     state.selectedSetlistItemId = selectedSetlist?.items.find((item) => item.songId === songId)?.id || null;
   }
@@ -2589,13 +3081,28 @@ function getAutoScrollTarget() {
 }
 
 function openPerformanceMode() {
-  if (!getSelectedSong()) {
+  const selectedSong = getSelectedSong();
+  if (!selectedSong) {
     return;
   }
+  captureOverlayFocus();
   hideChordTooltip();
+  const selectedSetlist =
+    state.workspaceMode === "setlists" && state.selectedSetlistId && state.selectedSetlistItemId
+      ? getSelectedSetlist()
+      : null;
+  state.performanceMode.context = {
+    workspaceMode: selectedSetlist ? "setlists" : "songs",
+    songId: selectedSong.id,
+    setlistId: selectedSetlist?.id || null,
+    setlistItemId: selectedSetlist?.items.some((item) => item.id === state.selectedSetlistItemId)
+      ? state.selectedSetlistItemId
+      : null,
+  };
   state.performanceMode.active = true;
   syncModalState();
   renderPerformanceMode();
+  focusAfterPaint(elements.performanceClose);
 }
 
 function closePerformanceMode() {
@@ -2604,13 +3111,18 @@ function closePerformanceMode() {
   }
   stopAutoScroll({ reset: true });
   state.performanceMode.active = false;
+  state.performanceMode.context = null;
   syncModalState();
   renderPerformanceMode();
+  restoreOverlayFocus();
 }
 
 function renderPerformanceMode() {
-  const selectedSong = getSelectedSong();
-  const selectedSetlist = getSelectedSetlist();
+  const performanceContext = state.performanceMode.context;
+  const selectedSong = performanceContext ? getSongById(performanceContext.songId) : getSelectedSong();
+  const selectedSetlist = performanceContext?.setlistId
+    ? state.setlists.find((setlist) => setlist.id === performanceContext.setlistId) ?? null
+    : null;
   elements.performanceScreen.hidden = !state.performanceMode.active;
   syncModalState();
 
@@ -2632,7 +3144,9 @@ function renderPerformanceMode() {
   );
 
   const setlistItems = selectedSetlist?.items || [];
-  const activeIndex = setlistItems.findIndex((item) => item.id === state.selectedSetlistItemId);
+  const activeIndex = performanceContext?.setlistItemId
+    ? setlistItems.findIndex((item) => item.id === performanceContext.setlistItemId)
+    : -1;
   const hasSetlistNavigation = activeIndex !== -1;
   elements.performancePrev.hidden = !hasSetlistNavigation;
   elements.performanceNext.hidden = !hasSetlistNavigation;
@@ -2657,6 +3171,12 @@ async function moveSetlistSelection(direction) {
   state.selectedSetlistItemId = nextItem.id;
   await selectSong(nextItem.songId, { tab: "preview", trackView: true });
   if (state.performanceMode.active) {
+    state.performanceMode.context = {
+      workspaceMode: "setlists",
+      songId: nextItem.songId,
+      setlistId: selectedSetlist.id,
+      setlistItemId: nextItem.id,
+    };
     renderPerformanceMode();
   }
 }
@@ -2846,8 +3366,7 @@ async function undoDelete() {
     await markSongViewed(restoredSong.id, { rerender: false });
     render();
   } catch (error) {
-    console.error(error);
-    setSaveStatus(error.message || "Unable to restore song");
+    reportOperationError(error, elements.saveStatus, "Unable to restore song");
   }
 }
 
