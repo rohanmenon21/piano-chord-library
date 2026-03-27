@@ -1718,8 +1718,15 @@ function switchWorkspaceMode(mode) {
 
   stopAutoScroll({ reset: true });
   hideChordTooltip();
+  if (mode === "songs") {
+    state.activeTab = "preview";
+  }
   if (mode === "setlists") {
     state.setlistActiveTab = "preview";
+    if (!state.selectedSetlistId && state.setlists.length > 0) {
+      selectSetlist(state.setlists[0].id);
+      return;
+    }
   }
   state.workspaceMode = mode;
   render();
