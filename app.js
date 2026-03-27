@@ -1554,18 +1554,23 @@ function renderSetlistList() {
         : "";
 
       return `
-        <div class="setlist-tree" role="treeitem" aria-level="1" aria-expanded="${String(isExpanded)}">
+        <div class="setlist-tree" role="listitem">
           <button
             class="setlist-item ${setlist.id === state.selectedSetlistId ? "active" : ""}"
             type="button"
             data-setlist-id="${setlist.id}"
             aria-expanded="${String(isExpanded)}"
             aria-current="${String(setlist.id === state.selectedSetlistId ? "true" : "false")}"
+            aria-controls="setlist-children-${setlist.id}"
           >
             <strong>${escapeHtml(setlist.name || "Untitled Setlist")}</strong>
             <span>${setlist.items.length} song${setlist.items.length === 1 ? "" : "s"}</span>
           </button>
-          <div class="setlist-children ${isExpanded ? "expanded" : ""}" role="group">
+          <div
+            id="setlist-children-${setlist.id}"
+            class="setlist-children ${isExpanded ? "expanded" : ""}"
+            aria-label="${escapeHtml(setlist.name || "Untitled Setlist")} songs"
+          >
             ${itemMarkup}
           </div>
         </div>
