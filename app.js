@@ -3,6 +3,7 @@ const CHORD_VOICING_KEY = "piano-chord-library-chord-voicings-v1";
 const UNDO_WINDOW_MS = 5000;
 const AUTOSAVE_MS = 700;
 const DEFAULT_SORT_MODE = "last_viewed";
+const DEFAULT_SETLIST_SORT_MODE = "recent";
 const DEFAULT_AUTO_SCROLL_SPEED = 0.1;
 const MAX_AUTO_SCROLL_PIXELS_PER_SECOND = 140;
 const AUTO_SCROLL_MIN_VISIBLE_SPEED = 0.1;
@@ -107,6 +108,8 @@ const state = {
   workspaceMode: "songs",
   searchTerm: "",
   sortMode: DEFAULT_SORT_MODE,
+  setlistSearchTerm: "",
+  setlistSortMode: DEFAULT_SETLIST_SORT_MODE,
   autoScrollSpeed: DEFAULT_AUTO_SCROLL_SPEED,
   autoScrollStatus: "idle",
   autoScrollFrame: null,
@@ -171,6 +174,8 @@ const elements = {
   songCount: document.querySelector("#song-count"),
   songSort: document.querySelector("#song-sort"),
   songSearch: document.querySelector("#song-search"),
+  setlistSort: document.querySelector("#setlist-sort"),
+  setlistSearch: document.querySelector("#setlist-search"),
   setlistList: document.querySelector("#setlist-list"),
   setlistCount: document.querySelector("#setlist-count"),
   newSetlistButton: document.querySelector("#new-setlist-button"),
@@ -333,10 +338,18 @@ function bindEvents() {
     state.searchTerm = event.target.value.trim().toLowerCase();
     renderSongList();
   });
+  elements.setlistSearch.addEventListener("input", (event) => {
+    state.setlistSearchTerm = event.target.value.trim().toLowerCase();
+    renderSetlistList();
+  });
   elements.songsWorkspaceTab.addEventListener("click", () => switchWorkspaceMode("songs"));
   elements.setlistsWorkspaceTab.addEventListener("click", () => switchWorkspaceMode("setlists"));
   elements.songSort.addEventListener("change", (event) => {
     void handleSortChange(event.target.value);
+  });
+  elements.setlistSort.addEventListener("change", (event) => {
+    state.setlistSortMode = normalizeSetlistSortMode(event.target.value);
+    renderSetlistList();
   });
   elements.newSetlistButton.addEventListener("click", () => {
     void createSetlist();
@@ -726,6 +739,10 @@ function showAuthStatus(message, isError) {
 
 function normalizeSortMode(value) {
   return ["last_viewed", "title", "artist"].includes(value) ? value : DEFAULT_SORT_MODE;
+}
+
+function normalizeSetlistSortMode(value) {
+  return ["recent", "name"].includes(value) ? value : DEFAULT_SETLIST_SORT_MODE;
 }
 
 function populateKeySelect() {
@@ -1300,6 +1317,7 @@ async function deleteSelectedSong() {
 
 function render() {
   elements.songSort.value = state.sortMode;
+  elements.setlistSort.value = state.setlistSortMode;
   elements.autoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   elements.setlistAutoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   renderTabs();
@@ -1405,13 +1423,21 @@ function getRenderableSongs() {
 }
 
 function renderSetlistList() {
-  elements.setlistCount.textContent = String(state.setlists.length);
-  if (state.setlists.length === 0) {
-    elements.setlistList.innerHTML = '<div class="empty-state">No setlists yet.</div>';
+  const filteredSetlists = [...state.setlists]
+    .sort(compareSetlistsForSortMode)
+    .filter((setlist) =>
+      (setlist.name || "Untitled Setlist").toLowerCase().includes(state.setlistSearchTerm),
+    );
+
+  elements.setlistCount.textContent = String(filteredSetlists.length);
+  if (filteredSetlists.length === 0) {
+    elements.setlistList.innerHTML = `<div class="empty-state">${
+      state.setlistSearchTerm ? "No matching setlists yet." : "No setlists yet."
+    }</div>`;
     return;
   }
 
-  elements.setlistList.innerHTML = state.setlists
+  elements.setlistList.innerHTML = filteredSetlists
     .map((setlist) => {
       const isExpanded = state.expandedSetlistId === setlist.id;
       const itemMarkup = isExpanded
@@ -1468,6 +1494,19 @@ function renderSetlistList() {
       void selectSong(songId, { trackView: true });
     });
   });
+}
+
+function compareSetlistsForSortMode(a, b) {
+  if (state.setlistSortMode === "name") {
+    return compareSongText(a.name || "Untitled Setlist", b.name || "Untitled Setlist");
+  }
+
+  const updatedCompare = (b.updatedAt || 0) - (a.updatedAt || 0);
+  if (updatedCompare !== 0) {
+    return updatedCompare;
+  }
+
+  return compareSongText(a.name || "Untitled Setlist", b.name || "Untitled Setlist");
 }
 
 function renderSetlistEditor() {

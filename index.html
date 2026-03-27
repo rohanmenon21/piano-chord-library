@@ -147,6 +147,20 @@
               <h2>Setlists</h2>
               <span id="setlist-count" class="pill">0</span>
             </div>
+            <label class="field sort-field">
+              <span>Sort by</span>
+              <select id="setlist-sort" aria-label="Sort setlists">
+                <option value="recent">Most Recent</option>
+                <option value="name">Setlist Name</option>
+              </select>
+            </label>
+            <input
+              id="setlist-search"
+              class="search-input"
+              type="search"
+              placeholder="Search setlists"
+              aria-label="Search setlists"
+            />
             <div id="setlist-list" class="song-list" aria-live="polite"></div>
           </section>
         </section>
