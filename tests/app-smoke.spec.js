@@ -1,5 +1,19 @@
 import { expect, test } from "@playwright/test";
 
+test("boots through the real /api/config path", async ({ page }) => {
+  const configResponsePromise = page.waitForResponse((response) => {
+    return response.url().endsWith("/api/config") && response.request().method() === "GET";
+  });
+
+  await page.goto("/");
+
+  const configResponse = await configResponsePromise;
+  await expect.soft(page).not.toHaveURL(/mock=1/);
+  expect(configResponse.status()).toBe(200);
+  await expect(page.locator("#auth-form")).toBeVisible();
+  await expect(page.locator("#auth-status")).toBeEmpty();
+});
+
 test("loads the mock app and opens song preview by default", async ({ page }) => {
   await page.goto("/?mock=1");
 
