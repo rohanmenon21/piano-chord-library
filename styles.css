@@ -326,6 +326,7 @@ select {
   padding: 24px;
 }
 
+.workspace-tabs,
 .mode-tabs {
   display: inline-flex;
   gap: 10px;
@@ -334,6 +335,14 @@ select {
   background: rgba(255, 245, 232, 0.9);
   border: 1px solid var(--line);
   margin-bottom: 24px;
+}
+
+.workspace-view {
+  display: none;
+}
+
+.workspace-view.active {
+  display: block;
 }
 
 .tab-button {
@@ -406,6 +415,36 @@ select {
 
 .setlist-editor {
   margin-bottom: 28px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 247, 236, 0.88);
+}
+
+.setlists-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.setlists-browser,
+.setlists-detail {
+  min-width: 0;
+}
+
+.setlists-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setlists-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.setlist-preview-card {
   padding: 20px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
@@ -962,6 +1001,10 @@ select {
     align-items: stretch;
   }
 
+  .setlists-layout {
+    grid-template-columns: 1fr;
+  }
+
   .transpose-panel,
   .song-list-header,
   .viewer-header {
@@ -1003,6 +1046,10 @@ select {
   }
 
   .mode-tabs {
+    display: flex;
+  }
+
+  .workspace-tabs {
     display: flex;
   }
 

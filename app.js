@@ -103,6 +103,7 @@ const state = {
   selectedSongId: null,
   selectedSetlistId: null,
   selectedSetlistItemId: null,
+  workspaceMode: "songs",
   searchTerm: "",
   sortMode: DEFAULT_SORT_MODE,
   autoScrollSpeed: DEFAULT_AUTO_SCROLL_SPEED,
@@ -158,6 +159,10 @@ const elements = {
   signOutButton: document.querySelector("#sign-out-button"),
   libraryHeading: document.querySelector("#library-heading"),
   librarySubtitle: document.querySelector("#library-subtitle"),
+  songsWorkspaceTab: document.querySelector("#songs-workspace-tab"),
+  setlistsWorkspaceTab: document.querySelector("#setlists-workspace-tab"),
+  songsWorkspace: document.querySelector("#songs-workspace"),
+  setlistsWorkspace: document.querySelector("#setlists-workspace"),
   songList: document.querySelector("#song-list"),
   songCount: document.querySelector("#song-count"),
   songSort: document.querySelector("#song-sort"),
@@ -203,6 +208,22 @@ const elements = {
   autoScrollToggle: document.querySelector("#auto-scroll-toggle"),
   autoScrollStatus: document.querySelector("#auto-scroll-status"),
   performanceModeButton: document.querySelector("#performance-mode-button"),
+  setlistPreviewTitle: document.querySelector("#setlist-preview-title"),
+  setlistPreviewArtist: document.querySelector("#setlist-preview-artist"),
+  setlistPreviewSongKey: document.querySelector("#setlist-preview-song-key"),
+  setlistOriginalKeyLabel: document.querySelector("#setlist-original-key-label"),
+  setlistSavedKeyLabel: document.querySelector("#setlist-saved-key-label"),
+  setlistTransposeStatus: document.querySelector("#setlist-transpose-status"),
+  setlistPreview: document.querySelector("#setlist-song-preview"),
+  setlistPreviewPrev: document.querySelector("#setlist-preview-prev"),
+  setlistPreviewNext: document.querySelector("#setlist-preview-next"),
+  setlistTransposeDown: document.querySelector("#setlist-transpose-down"),
+  setlistTransposeUp: document.querySelector("#setlist-transpose-up"),
+  setlistResetTranspose: document.querySelector("#setlist-reset-transpose"),
+  setlistPerformanceModeButton: document.querySelector("#setlist-performance-mode-button"),
+  setlistAutoScrollSpeed: document.querySelector("#setlist-auto-scroll-speed"),
+  setlistAutoScrollToggle: document.querySelector("#setlist-auto-scroll-toggle"),
+  setlistAutoScrollStatus: document.querySelector("#setlist-auto-scroll-status"),
   performanceScreen: document.querySelector("#performance-screen"),
   performanceContext: document.querySelector("#performance-context"),
   performanceTitle: document.querySelector("#performance-title"),
@@ -304,6 +325,8 @@ function bindEvents() {
     state.searchTerm = event.target.value.trim().toLowerCase();
     renderSongList();
   });
+  elements.songsWorkspaceTab.addEventListener("click", () => switchWorkspaceMode("songs"));
+  elements.setlistsWorkspaceTab.addEventListener("click", () => switchWorkspaceMode("setlists"));
   elements.songSort.addEventListener("change", (event) => {
     void handleSortChange(event.target.value);
   });
@@ -330,17 +353,37 @@ function bindEvents() {
   elements.resetTranspose.addEventListener("click", () => {
     void resetTranspose();
   });
+  elements.setlistTransposeUp.addEventListener("click", () => {
+    void transposeSelectedSong(1);
+  });
+  elements.setlistTransposeDown.addEventListener("click", () => {
+    void transposeSelectedSong(-1);
+  });
+  elements.setlistResetTranspose.addEventListener("click", () => {
+    void resetTranspose();
+  });
   elements.autoScrollSpeed.addEventListener("change", (event) => {
     handleAutoScrollSpeedChange(event.target.value);
   });
   elements.autoScrollToggle.addEventListener("click", toggleAutoScroll);
+  elements.setlistAutoScrollSpeed.addEventListener("change", (event) => {
+    handleAutoScrollSpeedChange(event.target.value);
+  });
+  elements.setlistAutoScrollToggle.addEventListener("click", toggleAutoScroll);
   elements.performanceModeButton.addEventListener("click", openPerformanceMode);
+  elements.setlistPerformanceModeButton.addEventListener("click", openPerformanceMode);
+  elements.setlistPreviewPrev.addEventListener("click", () => {
+    void moveSetlistSelection(-1);
+  });
+  elements.setlistPreviewNext.addEventListener("click", () => {
+    void moveSetlistSelection(1);
+  });
   elements.performanceClose.addEventListener("click", closePerformanceMode);
   elements.performancePrev.addEventListener("click", () => {
-    void movePerformanceSetlistSelection(-1);
+    void moveSetlistSelection(-1);
   });
   elements.performanceNext.addEventListener("click", () => {
-    void movePerformanceSetlistSelection(1);
+    void moveSetlistSelection(1);
   });
   elements.performanceTransposeDown.addEventListener("click", () => {
     void transposeSelectedSong(-1);
@@ -358,6 +401,9 @@ function bindEvents() {
   elements.preview.addEventListener("mouseover", handlePreviewMouseOver);
   elements.preview.addEventListener("mousemove", handlePreviewMouseMove);
   elements.preview.addEventListener("mouseleave", scheduleHideChordTooltip);
+  elements.setlistPreview.addEventListener("mouseover", handlePreviewMouseOver);
+  elements.setlistPreview.addEventListener("mousemove", handlePreviewMouseMove);
+  elements.setlistPreview.addEventListener("mouseleave", scheduleHideChordTooltip);
   elements.chordTooltip.addEventListener("mouseenter", handleTooltipMouseEnter);
   elements.chordTooltip.addEventListener("mouseleave", handleTooltipMouseLeave);
   elements.tooltipPrev.addEventListener("click", () => changeTooltipVoicing(-1));
@@ -406,6 +452,7 @@ async function handleSessionChange(session) {
     state.selectedSongId = null;
     state.selectedSetlistId = null;
     state.selectedSetlistItemId = null;
+    state.workspaceMode = "songs";
     state.activeTab = "edit";
     closePerformanceMode();
     clearPendingDelete();
@@ -692,6 +739,7 @@ async function loadSongsForCurrentUser() {
 
   if (state.songs.length > 0) {
     state.selectedSongId = state.songs[0].id;
+    state.workspaceMode = "songs";
     state.activeTab = "preview";
     await markSongViewed(state.selectedSongId, { rerender: false });
   } else {
@@ -805,6 +853,7 @@ function createBlankSong() {
 
   state.selectedSetlistId = null;
   state.selectedSetlistItemId = null;
+  state.workspaceMode = "songs";
   state.songs = [newSong, ...state.songs.filter((song) => !song.isDraft)];
   state.selectedSongId = newSong.id;
   state.activeTab = "edit";
@@ -981,8 +1030,8 @@ async function createSetlist() {
 
 function selectSetlist(setlistId) {
   const setlist = state.setlists.find((entry) => entry.id === setlistId);
+  state.workspaceMode = "setlists";
   state.selectedSetlistId = setlistId;
-  state.activeTab = "edit";
 
   if (setlist?.items?.length) {
     state.selectedSetlistItemId = setlist.items[0].id;
@@ -1229,14 +1278,33 @@ async function deleteSelectedSong() {
 function render() {
   elements.songSort.value = state.sortMode;
   elements.autoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
+  elements.setlistAutoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   renderTabs();
+  renderWorkspaceTabs();
   renderSongList();
   renderSetlistList();
+  renderWorkspacePanels();
   renderSetlistEditor();
   renderSelectedSong();
   renderUndoToast();
   renderAutoScrollControls();
   renderPerformanceMode();
+}
+
+function renderWorkspaceTabs() {
+  const isSongs = state.workspaceMode === "songs";
+  elements.songsWorkspaceTab.classList.toggle("active", isSongs);
+  elements.setlistsWorkspaceTab.classList.toggle("active", !isSongs);
+  elements.songsWorkspaceTab.setAttribute("aria-selected", String(isSongs));
+  elements.setlistsWorkspaceTab.setAttribute("aria-selected", String(!isSongs));
+}
+
+function renderWorkspacePanels() {
+  const isSongs = state.workspaceMode === "songs";
+  elements.songsWorkspace.classList.toggle("active", isSongs);
+  elements.setlistsWorkspace.classList.toggle("active", !isSongs);
+  elements.songsWorkspace.hidden = !isSongs;
+  elements.setlistsWorkspace.hidden = isSongs;
 }
 
 function renderTabs() {
@@ -1281,6 +1349,7 @@ function renderSongList() {
 
       elements.songList.querySelectorAll("[data-song-id]").forEach((button) => {
     button.addEventListener("click", () => {
+      state.workspaceMode = "songs";
       state.selectedSetlistId = null;
       state.selectedSetlistItemId = null;
       void selectSong(button.dataset.songId, { tab: "preview", trackView: true });
@@ -1323,8 +1392,6 @@ function renderSetlistEditor() {
   const selectedSetlist = getSelectedSetlist();
   const showSetlist = Boolean(selectedSetlist);
   elements.setlistEditor.hidden = !showSetlist;
-  elements.form.hidden = showSetlist;
-  elements.deleteSongButton.disabled = showSetlist;
 
   if (!selectedSetlist) {
     return;
@@ -1363,7 +1430,7 @@ function renderSetlistEditor() {
       const songId = button.dataset.setlistSongId;
       const item = selectedSetlist.items.find((entry) => entry.songId === songId);
       state.selectedSetlistItemId = item?.id || null;
-      void selectSong(songId, { tab: "preview", trackView: true });
+      void selectSong(songId, { trackView: true });
       render();
     });
   });
@@ -1384,19 +1451,99 @@ function renderSetlistEditor() {
 function renderSelectedSong() {
   const selectedSong = getSelectedSong();
   elements.performanceModeButton.disabled = !selectedSong;
+  elements.setlistPerformanceModeButton.disabled = !selectedSong || !state.selectedSetlistId;
+
+  if (selectedSong) {
+    fillForm(selectedSong);
+  }
+
+  renderSongsPreview(selectedSong);
+  renderSetlistPreview(selectedSong);
+}
+
+function renderSongsPreview(selectedSong) {
   if (!selectedSong) {
-    elements.previewTitle.textContent = state.selectedSetlistId ? "Select a song in this setlist" : "Select or create a song";
-    elements.previewArtist.textContent = state.selectedSetlistId ? "Setlist is empty" : "Unknown artist";
+    elements.previewTitle.textContent = "Select or create a song";
+    elements.previewArtist.textContent = "Unknown artist";
     elements.previewSongKey.textContent = "Showing: -";
-    elements.preview.textContent = state.selectedSetlistId
-      ? "This setlist is empty. Add songs in the Edit tab to start performing."
-      : "No song selected yet.";
-    resetAutoScroll();
+    elements.originalKeyLabel.textContent = "-";
+    elements.savedKeyLabel.textContent = "-";
+    elements.transposeStatus.textContent = "0";
+    elements.preview.textContent = "No song selected yet.";
+    if (state.workspaceMode === "songs" && state.activeTab === "preview") {
+      resetAutoScroll();
+    }
     return;
   }
 
-  fillForm(selectedSong);
-  updatePreview(selectedSong);
+  renderPreviewSurface(selectedSong, {
+    titleEl: elements.previewTitle,
+    artistEl: elements.previewArtist,
+    songKeyEl: elements.previewSongKey,
+    originalKeyEl: elements.originalKeyLabel,
+    savedKeyEl: elements.savedKeyLabel,
+    transposeStatusEl: elements.transposeStatus,
+    previewEl: elements.preview,
+    emptyText: "Paste lyrics and chords to preview them here.",
+    shouldResetScroll: state.workspaceMode === "songs" && state.activeTab === "preview",
+  });
+}
+
+function renderSetlistPreview(selectedSong) {
+  const selectedSetlist = getSelectedSetlist();
+  if (!selectedSetlist) {
+    elements.setlistTitle.textContent = "Select a setlist";
+    elements.setlistPreviewTitle.textContent = "Select a setlist";
+    elements.setlistPreviewArtist.textContent = "Choose a setlist to view its songs";
+    elements.setlistPreviewSongKey.textContent = "Showing: -";
+    elements.setlistOriginalKeyLabel.textContent = "-";
+    elements.setlistSavedKeyLabel.textContent = "-";
+    elements.setlistTransposeStatus.textContent = "0";
+    elements.setlistPreview.textContent = "Create or select a setlist to view and preview its songs here.";
+    elements.setlistPreviewPrev.disabled = true;
+    elements.setlistPreviewNext.disabled = true;
+    if (state.workspaceMode === "setlists") {
+      resetAutoScroll();
+    }
+    return;
+  }
+
+  if (!selectedSong || !selectedSetlist.items.some((item) => item.songId === selectedSong.id)) {
+    elements.setlistPreviewTitle.textContent = selectedSetlist.name || "Untitled Setlist";
+    elements.setlistPreviewArtist.textContent = selectedSetlist.items.length
+      ? "Select a song from this setlist"
+      : "This setlist is empty";
+    elements.setlistPreviewSongKey.textContent = "Showing: -";
+    elements.setlistOriginalKeyLabel.textContent = "-";
+    elements.setlistSavedKeyLabel.textContent = "-";
+    elements.setlistTransposeStatus.textContent = "0";
+    elements.setlistPreview.textContent = selectedSetlist.items.length
+      ? "Select a song from the setlist above to preview it here."
+      : "Add songs to this setlist to start previewing them here.";
+    elements.setlistPreviewPrev.disabled = true;
+    elements.setlistPreviewNext.disabled = true;
+    if (state.workspaceMode === "setlists") {
+      resetAutoScroll();
+    }
+    return;
+  }
+
+  renderPreviewSurface(selectedSong, {
+    titleEl: elements.setlistPreviewTitle,
+    artistEl: elements.setlistPreviewArtist,
+    songKeyEl: elements.setlistPreviewSongKey,
+    originalKeyEl: elements.setlistOriginalKeyLabel,
+    savedKeyEl: elements.setlistSavedKeyLabel,
+    transposeStatusEl: elements.setlistTransposeStatus,
+    previewEl: elements.setlistPreview,
+    emptyText: "Paste lyrics and chords to preview them here.",
+    shouldResetScroll: state.workspaceMode === "setlists",
+  });
+
+  const activeIndex = selectedSetlist.items.findIndex((item) => item.id === state.selectedSetlistItemId);
+  elements.setlistPreviewPrev.disabled = activeIndex <= 0;
+  elements.setlistPreviewNext.disabled =
+    activeIndex === -1 || activeIndex >= selectedSetlist.items.length - 1;
 }
 
 function renderUndoToast() {
@@ -1417,25 +1564,38 @@ function fillForm(song) {
   elements.content.value = song.content;
 }
 
-function updatePreview(song) {
-  resetAutoScroll();
+function renderPreviewSurface(song, {
+  titleEl,
+  artistEl,
+  songKeyEl,
+  originalKeyEl,
+  savedKeyEl,
+  transposeStatusEl,
+  previewEl,
+  emptyText,
+  shouldResetScroll,
+}) {
+  if (shouldResetScroll) {
+    resetAutoScroll();
+  }
+
   const displayedKey = song.savedKey || transposeKey(song.originalKey, song.savedTranspose);
 
-  elements.previewTitle.textContent = song.title || "Untitled Song";
-  elements.previewArtist.textContent = song.artist || "Unknown artist";
-  elements.previewSongKey.textContent = `Showing: ${displayedKey}`;
-  elements.originalKeyLabel.textContent = song.originalKey;
-  elements.savedKeyLabel.textContent = displayedKey;
-  elements.transposeStatus.textContent = formatTranspose(song.savedTranspose);
+  titleEl.textContent = song.title || "Untitled Song";
+  artistEl.textContent = song.artist || "Unknown artist";
+  songKeyEl.textContent = `Showing: ${displayedKey}`;
+  originalKeyEl.textContent = song.originalKey;
+  savedKeyEl.textContent = displayedKey;
+  transposeStatusEl.textContent = formatTranspose(song.savedTranspose);
 
   const transposedContent = transposeSheet(song.content, song.savedTranspose);
   if (!transposedContent) {
-    elements.preview.textContent = "Paste lyrics and chords to preview them here.";
+    previewEl.textContent = emptyText;
     hideChordTooltip();
     return;
   }
 
-  elements.preview.innerHTML = renderPreviewMarkup(transposedContent);
+  previewEl.innerHTML = renderPreviewMarkup(transposedContent);
 }
 
 function syncDraftPreview() {
@@ -1453,7 +1613,7 @@ function syncDraftPreview() {
     savedKey: transposeKey(elements.originalKey.value, selectedSong.savedTranspose),
   };
 
-  updatePreview(draftSong);
+  renderSongsPreview(draftSong);
 }
 
 function switchTab(tab) {
@@ -1468,6 +1628,17 @@ function switchTab(tab) {
   if (tab !== "preview") {
     hideChordTooltip();
   }
+}
+
+function switchWorkspaceMode(mode) {
+  if (!["songs", "setlists"].includes(mode) || state.workspaceMode === mode) {
+    return;
+  }
+
+  stopAutoScroll({ reset: true });
+  hideChordTooltip();
+  state.workspaceMode = mode;
+  render();
 }
 
 function handlePreviewMouseOver(event) {
@@ -2066,7 +2237,9 @@ async function selectSong(songId, { tab = state.activeTab, trackView = true } = 
     const selectedSetlist = getSelectedSetlist();
     state.selectedSetlistItemId = selectedSetlist?.items.find((item) => item.songId === songId)?.id || null;
   }
-  state.activeTab = tab;
+  if (state.workspaceMode === "songs") {
+    state.activeTab = tab;
+  }
   render();
 
   if (trackView) {
@@ -2126,7 +2299,7 @@ function handleAutoScrollSpeedChange(value) {
 }
 
 function toggleAutoScroll() {
-  if (state.activeTab !== "preview") {
+  if (!canUseAutoScroll()) {
     return;
   }
 
@@ -2141,6 +2314,18 @@ function toggleAutoScroll() {
   }
 
   startAutoScroll();
+}
+
+function canUseAutoScroll() {
+  if (state.performanceMode.active) {
+    return true;
+  }
+
+  if (state.workspaceMode === "songs") {
+    return state.activeTab === "preview";
+  }
+
+  return Boolean(state.selectedSetlistId);
 }
 
 function startAutoScroll() {
@@ -2219,31 +2404,42 @@ function runAutoScrollFrame(timestamp) {
 
 function renderAutoScrollControls() {
   elements.autoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
+  elements.setlistAutoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   elements.performanceAutoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   if (state.autoScrollStatus === "running") {
     elements.autoScrollToggle.textContent = "Pause";
+    elements.setlistAutoScrollToggle.textContent = "Pause";
     elements.performanceAutoScrollToggle.textContent = "Pause";
     elements.autoScrollStatus.textContent = `Scrolling at ${state.autoScrollSpeed.toFixed(1)}`;
+    elements.setlistAutoScrollStatus.textContent = `Scrolling at ${state.autoScrollSpeed.toFixed(1)}`;
     elements.performanceAutoScrollStatus.textContent = `Scrolling at ${state.autoScrollSpeed.toFixed(1)}`;
     return;
   }
 
   if (state.autoScrollStatus === "paused") {
     elements.autoScrollToggle.textContent = "Resume";
+    elements.setlistAutoScrollToggle.textContent = "Resume";
     elements.performanceAutoScrollToggle.textContent = "Resume";
     elements.autoScrollStatus.textContent = `Paused at ${state.autoScrollSpeed.toFixed(1)}`;
+    elements.setlistAutoScrollStatus.textContent = `Paused at ${state.autoScrollSpeed.toFixed(1)}`;
     elements.performanceAutoScrollStatus.textContent = `Paused at ${state.autoScrollSpeed.toFixed(1)}`;
     return;
   }
 
   elements.autoScrollToggle.textContent = "Start";
+  elements.setlistAutoScrollToggle.textContent = "Start";
   elements.performanceAutoScrollToggle.textContent = "Start";
   elements.autoScrollStatus.textContent = "Ready";
+  elements.setlistAutoScrollStatus.textContent = "Ready";
   elements.performanceAutoScrollStatus.textContent = "Ready";
 }
 
 function getAutoScrollTarget() {
-  return state.performanceMode.active ? elements.performancePreview : elements.preview;
+  if (state.performanceMode.active) {
+    return elements.performancePreview;
+  }
+
+  return state.workspaceMode === "setlists" ? elements.setlistPreview : elements.preview;
 }
 
 function openPerformanceMode() {
@@ -2299,7 +2495,7 @@ function renderPerformanceMode() {
     !hasSetlistNavigation || activeIndex === setlistItems.length - 1;
 }
 
-async function movePerformanceSetlistSelection(direction) {
+async function moveSetlistSelection(direction) {
   const selectedSetlist = getSelectedSetlist();
   if (!selectedSetlist) {
     return;
@@ -2314,7 +2510,9 @@ async function movePerformanceSetlistSelection(direction) {
   const nextItem = selectedSetlist.items[nextIndex];
   state.selectedSetlistItemId = nextItem.id;
   await selectSong(nextItem.songId, { tab: "preview", trackView: true });
-  renderPerformanceMode();
+  if (state.performanceMode.active) {
+    renderPerformanceMode();
+  }
 }
 
 function getMappedAutoScrollSpeed(visibleSpeed) {

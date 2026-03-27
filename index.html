@@ -112,16 +112,6 @@
           <div id="song-list" class="song-list" aria-live="polite"></div>
         </section>
 
-        <section class="setlist-panel">
-          <div class="song-list-header">
-            <h2>Setlists</h2>
-            <span id="setlist-count" class="pill">0</span>
-          </div>
-          <button id="new-setlist-button" class="ghost-button" type="button">
-            New Setlist
-          </button>
-          <div id="setlist-list" class="song-list" aria-live="polite"></div>
-        </section>
       </aside>
 
       <main class="main-content">
@@ -144,219 +134,334 @@
         </header>
 
         <section class="workspace-card">
-          <div class="mode-tabs" role="tablist" aria-label="Song workspace mode">
+          <div class="workspace-tabs" role="tablist" aria-label="Library workspace">
             <button
-              id="edit-tab"
+              id="songs-workspace-tab"
               class="tab-button active"
               type="button"
               role="tab"
               aria-selected="true"
-              aria-controls="edit-panel"
+              aria-controls="songs-workspace"
             >
-              Edit
+              Songs
             </button>
             <button
-              id="preview-tab"
+              id="setlists-workspace-tab"
               class="tab-button"
               type="button"
               role="tab"
               aria-selected="false"
-              aria-controls="preview-panel"
+              aria-controls="setlists-workspace"
             >
-              Preview
+              Setlists
             </button>
           </div>
 
-          <section id="edit-panel" class="tab-panel active" role="tabpanel">
-            <section id="setlist-editor" class="setlist-editor" hidden>
+          <section id="songs-workspace" class="workspace-view active" role="tabpanel">
+            <div class="mode-tabs" role="tablist" aria-label="Song workspace mode">
+              <button
+                id="edit-tab"
+                class="tab-button active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="edit-panel"
+              >
+                Edit
+              </button>
+              <button
+                id="preview-tab"
+                class="tab-button"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="preview-panel"
+              >
+                Preview
+              </button>
+            </div>
+
+            <section id="edit-panel" class="tab-panel active" role="tabpanel">
               <div class="section-heading">
-                <p class="eyebrow">Setlist Builder</p>
-                <h2 id="setlist-title">Select a setlist</h2>
+                <p class="eyebrow">Song Details</p>
+                <h2>Edit Song</h2>
               </div>
 
-              <form id="setlist-form" class="song-form">
-                <label class="field">
-                  <span>Setlist Name</span>
-                  <input id="setlist-name" type="text" />
-                </label>
-
-                <div class="setlist-add-row">
-                  <label class="field">
-                    <span>Add Song</span>
-                    <select id="setlist-song-select"></select>
-                  </label>
-                  <button id="add-setlist-song-button" class="primary-button" type="button">
-                    Add Song
-                  </button>
+              <section class="import-card">
+                <div class="import-header">
+                  <div>
+                    <p class="eyebrow">Quick Import</p>
+                    <h3>Import From URL</h3>
+                  </div>
+                  <span id="import-status" class="import-status" aria-live="polite">
+                    Paste a song page link
+                  </span>
                 </div>
 
-                <div id="setlist-items" class="setlist-items"></div>
+                <div class="import-row">
+                  <input
+                    id="import-url"
+                    class="search-input"
+                    type="url"
+                    placeholder="https://example.com/song-page"
+                  />
+                  <button id="import-button" class="ghost-button" type="button">
+                    Import
+                  </button>
+                </div>
+              </section>
+
+              <form id="song-form" class="song-form">
+                <label class="field">
+                  <span>Song Title</span>
+                  <input id="song-title" name="title" type="text" />
+                </label>
+
+                <div class="field-row">
+                  <label class="field">
+                    <span>Artist</span>
+                    <input id="song-artist" name="artist" type="text" />
+                  </label>
+
+                  <label class="field">
+                    <span>Original Key</span>
+                    <select id="song-key" name="originalKey"></select>
+                  </label>
+                </div>
+
+                <label class="field">
+                  <span>Chord + lyric sheet</span>
+                  <textarea
+                    id="song-content"
+                    name="content"
+                    rows="16"
+                    placeholder="Paste your song here with chords above the lyrics"
+                  ></textarea>
+                </label>
 
                 <div class="form-actions">
-                  <button class="primary-button" type="submit">Save Setlist</button>
-                  <span id="setlist-save-status" class="save-status" aria-live="polite">
+                  <button class="primary-button" type="submit">Save Song</button>
+                  <span id="save-status" class="save-status" aria-live="polite">
                     Saved
                   </span>
-                  <button id="delete-setlist-button" class="ghost-button" type="button">
-                    Delete Setlist
+                  <button id="delete-song-button" class="ghost-button" type="button">
+                    Delete Song
                   </button>
                 </div>
               </form>
             </section>
 
-            <div class="section-heading">
-              <p class="eyebrow">Song Details</p>
-              <h2>Edit Song</h2>
-            </div>
-
-            <section class="import-card">
-              <div class="import-header">
-                <div>
-                  <p class="eyebrow">Quick Import</p>
-                  <h3>Import From URL</h3>
+            <section id="preview-panel" class="tab-panel" role="tabpanel" hidden>
+              <div class="viewer-header">
+                <div class="section-heading">
+                  <p class="eyebrow">Live Preview</p>
+                  <h2 id="preview-title">Select or create a song</h2>
                 </div>
-                <span id="import-status" class="import-status" aria-live="polite">
-                  Paste a song page link
-                </span>
+
+                <div class="transpose-panel">
+                  <div class="key-badges">
+                    <span class="badge">
+                      Original: <strong id="original-key-label">-</strong>
+                    </span>
+                    <span class="badge">
+                      Saved transpose: <strong id="saved-key-label">-</strong>
+                    </span>
+                  </div>
+
+                  <div class="transpose-controls">
+                    <button id="transpose-down" class="ghost-button" type="button">
+                      - Semitone
+                    </button>
+                    <span id="transpose-status" class="transpose-status">0</span>
+                    <button id="transpose-up" class="ghost-button" type="button">
+                      + Semitone
+                    </button>
+                    <button id="reset-transpose" class="ghost-button" type="button">
+                      Reset
+                    </button>
+                    <button id="performance-mode-button" class="primary-button" type="button">
+                      Performance Mode
+                    </button>
+                  </div>
+
+                  <div class="auto-scroll-controls" aria-label="Auto scroll controls">
+                    <label class="field auto-scroll-field">
+                      <span>Speed</span>
+                      <select id="auto-scroll-speed" aria-label="Auto scroll speed">
+                        <option value="0.1" selected>0.1</option>
+                        <option value="0.2">0.2</option>
+                        <option value="0.3">0.3</option>
+                        <option value="0.4">0.4</option>
+                        <option value="0.5">0.5</option>
+                        <option value="0.6">0.6</option>
+                        <option value="0.7">0.7</option>
+                        <option value="0.8">0.8</option>
+                        <option value="0.9">0.9</option>
+                        <option value="1.0">1.0</option>
+                      </select>
+                    </label>
+                    <button id="auto-scroll-toggle" class="primary-button" type="button">
+                      Start
+                    </button>
+                    <span id="auto-scroll-status" class="auto-scroll-status" aria-live="polite">
+                      Ready
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div class="import-row">
-                <input
-                  id="import-url"
-                  class="search-input"
-                  type="url"
-                  placeholder="https://example.com/song-page"
-                />
-                <button id="import-button" class="ghost-button" type="button">
-                  Import
-                </button>
+              <div class="preview-meta">
+                <span id="preview-artist" class="pill subtle">Artist</span>
+                <span id="preview-song-key" class="pill subtle">Key</span>
               </div>
+
+              <pre id="song-preview" class="song-preview">No song selected yet.</pre>
             </section>
+          </section>
 
-            <form id="song-form" class="song-form">
-              <label class="field">
-                <span>Song Title</span>
-                <input id="song-title" name="title" type="text" />
-              </label>
+          <section id="setlists-workspace" class="workspace-view" role="tabpanel" hidden>
+            <div class="setlists-layout">
+              <section class="setlists-browser">
+                <div class="song-list-header">
+                  <h2>Setlists</h2>
+                  <span id="setlist-count" class="pill">0</span>
+                </div>
+                <button id="new-setlist-button" class="primary-button" type="button">
+                  New Setlist
+                </button>
+                <div id="setlist-list" class="song-list" aria-live="polite"></div>
+              </section>
 
-              <div class="field-row">
-                <label class="field">
-                  <span>Artist</span>
-                  <input id="song-artist" name="artist" type="text" />
-                </label>
+              <section class="setlists-detail">
+                <section id="setlist-editor" class="setlist-editor">
+                  <div class="section-heading">
+                    <p class="eyebrow">Setlist Builder</p>
+                    <h2 id="setlist-title">Select a setlist</h2>
+                  </div>
 
-                <label class="field">
-                  <span>Original Key</span>
-                  <select id="song-key" name="originalKey"></select>
-                </label>
+                  <form id="setlist-form" class="song-form">
+                    <label class="field">
+                      <span>Setlist Name</span>
+                      <input id="setlist-name" type="text" />
+                    </label>
+
+                    <div class="setlist-add-row">
+                      <label class="field">
+                        <span>Add Song</span>
+                        <select id="setlist-song-select"></select>
+                      </label>
+                      <button id="add-setlist-song-button" class="primary-button" type="button">
+                        Add Song
+                      </button>
+                    </div>
+
+                    <div id="setlist-items" class="setlist-items"></div>
+
+                    <div class="form-actions">
+                      <button class="primary-button" type="submit">Save Setlist</button>
+                      <span id="setlist-save-status" class="save-status" aria-live="polite">
+                        Saved
+                      </span>
+                      <button id="delete-setlist-button" class="ghost-button" type="button">
+                        Delete Setlist
+                      </button>
+                    </div>
+                  </form>
+                </section>
+
+                <section class="setlist-preview-card">
+                  <div class="viewer-header">
+                    <div class="section-heading">
+                      <p class="eyebrow">Setlist Preview</p>
+                      <h2 id="setlist-preview-title">Select a setlist</h2>
+                    </div>
+
+                    <div class="transpose-panel">
+                      <div class="key-badges">
+                        <span class="badge">
+                          Original: <strong id="setlist-original-key-label">-</strong>
+                        </span>
+                        <span class="badge">
+                          Saved transpose: <strong id="setlist-saved-key-label">-</strong>
+                        </span>
+                      </div>
+
+                      <div class="transpose-controls">
+                        <button id="setlist-preview-prev" class="ghost-button" type="button">
+                          Previous
+                        </button>
+                        <button id="setlist-preview-next" class="ghost-button" type="button">
+                          Next
+                        </button>
+                        <button id="setlist-transpose-down" class="ghost-button" type="button">
+                          - Semitone
+                        </button>
+                        <span id="setlist-transpose-status" class="transpose-status">0</span>
+                        <button id="setlist-transpose-up" class="ghost-button" type="button">
+                          + Semitone
+                        </button>
+                        <button id="setlist-reset-transpose" class="ghost-button" type="button">
+                          Reset
+                        </button>
+                        <button id="setlist-performance-mode-button" class="primary-button" type="button">
+                          Performance Mode
+                        </button>
+                      </div>
+
+                      <div class="auto-scroll-controls" aria-label="Setlist auto scroll controls">
+                        <label class="field auto-scroll-field">
+                          <span>Speed</span>
+                          <select id="setlist-auto-scroll-speed" aria-label="Setlist auto scroll speed">
+                            <option value="0.1" selected>0.1</option>
+                            <option value="0.2">0.2</option>
+                            <option value="0.3">0.3</option>
+                            <option value="0.4">0.4</option>
+                            <option value="0.5">0.5</option>
+                            <option value="0.6">0.6</option>
+                            <option value="0.7">0.7</option>
+                            <option value="0.8">0.8</option>
+                            <option value="0.9">0.9</option>
+                            <option value="1.0">1.0</option>
+                          </select>
+                        </label>
+                        <button id="setlist-auto-scroll-toggle" class="primary-button" type="button">
+                          Start
+                        </button>
+                        <span id="setlist-auto-scroll-status" class="auto-scroll-status" aria-live="polite">
+                          Ready
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="preview-meta">
+                    <span id="setlist-preview-artist" class="pill subtle">Artist</span>
+                    <span id="setlist-preview-song-key" class="pill subtle">Key</span>
+                  </div>
+
+                  <pre id="setlist-song-preview" class="song-preview">Select a setlist to preview its songs.</pre>
+                </section>
+              </section>
+            </div>
+          </section>
+          <div id="chord-tooltip" class="chord-tooltip" hidden>
+            <div class="tooltip-header">
+              <div class="tooltip-title-group">
+                <strong id="tooltip-chord-name">C</strong>
+                <span id="tooltip-chord-notes">C E G</span>
               </div>
-
-              <label class="field">
-                <span>Chord + lyric sheet</span>
-                <textarea
-                  id="song-content"
-                  name="content"
-                  rows="16"
-                  placeholder="Paste your song here with chords above the lyrics"
-                ></textarea>
-              </label>
-
-              <div class="form-actions">
-                <button class="primary-button" type="submit">Save Song</button>
-                <span id="save-status" class="save-status" aria-live="polite">
-                  Saved
-                </span>
-                <button id="delete-song-button" class="ghost-button" type="button">
-                  Delete Song
+              <div class="tooltip-controls">
+                <button id="tooltip-prev" class="tooltip-arrow" type="button" aria-label="Previous voicing">
+                  &#x2039;
+                </button>
+                <span id="tooltip-voicing-index" class="tooltip-voicing-index">1 / 3</span>
+                <button id="tooltip-next" class="tooltip-arrow" type="button" aria-label="Next voicing">
+                  &#x203A;
                 </button>
               </div>
-            </form>
-          </section>
-
-          <section id="preview-panel" class="tab-panel" role="tabpanel" hidden>
-            <div class="viewer-header">
-              <div class="section-heading">
-                <p class="eyebrow">Live Preview</p>
-                <h2 id="preview-title">Select or create a song</h2>
-              </div>
-
-              <div class="transpose-panel">
-                <div class="key-badges">
-                  <span class="badge">
-                    Original: <strong id="original-key-label">-</strong>
-                  </span>
-                  <span class="badge">
-                    Saved transpose: <strong id="saved-key-label">-</strong>
-                  </span>
-                </div>
-
-                <div class="transpose-controls">
-                  <button id="transpose-down" class="ghost-button" type="button">
-                    - Semitone
-                  </button>
-                  <span id="transpose-status" class="transpose-status">0</span>
-                  <button id="transpose-up" class="ghost-button" type="button">
-                    + Semitone
-                  </button>
-                  <button id="reset-transpose" class="ghost-button" type="button">
-                    Reset
-                  </button>
-                  <button id="performance-mode-button" class="primary-button" type="button">
-                    Performance Mode
-                  </button>
-                </div>
-
-                <div class="auto-scroll-controls" aria-label="Auto scroll controls">
-                  <label class="field auto-scroll-field">
-                    <span>Speed</span>
-                    <select id="auto-scroll-speed" aria-label="Auto scroll speed">
-                      <option value="0.1" selected>0.1</option>
-                      <option value="0.2">0.2</option>
-                      <option value="0.3">0.3</option>
-                      <option value="0.4">0.4</option>
-                      <option value="0.5">0.5</option>
-                      <option value="0.6">0.6</option>
-                      <option value="0.7">0.7</option>
-                      <option value="0.8">0.8</option>
-                      <option value="0.9">0.9</option>
-                      <option value="1.0">1.0</option>
-                    </select>
-                  </label>
-                  <button id="auto-scroll-toggle" class="primary-button" type="button">
-                    Start
-                  </button>
-                  <span id="auto-scroll-status" class="auto-scroll-status" aria-live="polite">
-                    Ready
-                  </span>
-                </div>
-              </div>
             </div>
-
-            <div class="preview-meta">
-              <span id="preview-artist" class="pill subtle">Artist</span>
-              <span id="preview-song-key" class="pill subtle">Key</span>
-            </div>
-
-            <pre id="song-preview" class="song-preview">No song selected yet.</pre>
-            <div id="chord-tooltip" class="chord-tooltip" hidden>
-              <div class="tooltip-header">
-                <div class="tooltip-title-group">
-                  <strong id="tooltip-chord-name">C</strong>
-                  <span id="tooltip-chord-notes">C E G</span>
-                </div>
-                <div class="tooltip-controls">
-                  <button id="tooltip-prev" class="tooltip-arrow" type="button" aria-label="Previous voicing">
-                    &#x2039;
-                  </button>
-                  <span id="tooltip-voicing-index" class="tooltip-voicing-index">1 / 3</span>
-                  <button id="tooltip-next" class="tooltip-arrow" type="button" aria-label="Next voicing">
-                    &#x203A;
-                  </button>
-                </div>
-              </div>
-              <div id="tooltip-piano" class="tooltip-piano"></div>
-            </div>
-          </section>
+            <div id="tooltip-piano" class="tooltip-piano"></div>
+          </div>
         </section>
       </main>
     </div>
