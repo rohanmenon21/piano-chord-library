@@ -103,6 +103,7 @@ const state = {
   selectedSongId: null,
   selectedSetlistId: null,
   selectedSetlistItemId: null,
+  expandedSetlistId: null,
   workspaceMode: "songs",
   searchTerm: "",
   sortMode: DEFAULT_SORT_MODE,
@@ -113,6 +114,7 @@ const state = {
   saveStatusTimer: null,
   autosaveTimer: null,
   activeTab: "edit",
+  setlistActiveTab: "preview",
   currentView: "loading",
   authMode: "signin",
   hoveredChord: null,
@@ -197,8 +199,12 @@ const elements = {
   saveStatus: document.querySelector("#save-status"),
   editTab: document.querySelector("#edit-tab"),
   previewTab: document.querySelector("#preview-tab"),
+  setlistEditTab: document.querySelector("#setlist-edit-tab"),
+  setlistPreviewTab: document.querySelector("#setlist-preview-tab"),
   editPanel: document.querySelector("#edit-panel"),
   previewPanel: document.querySelector("#preview-panel"),
+  setlistEditPanel: document.querySelector("#setlist-edit-panel"),
+  setlistPreviewPanel: document.querySelector("#setlist-preview-panel"),
   previewTitle: document.querySelector("#preview-title"),
   previewArtist: document.querySelector("#preview-artist"),
   previewSongKey: document.querySelector("#preview-song-key"),
@@ -346,6 +352,8 @@ function bindEvents() {
   });
   elements.editTab.addEventListener("click", () => switchTab("edit"));
   elements.previewTab.addEventListener("click", () => switchTab("preview"));
+  elements.setlistEditTab.addEventListener("click", () => switchSetlistTab("edit"));
+  elements.setlistPreviewTab.addEventListener("click", () => switchSetlistTab("preview"));
   elements.transposeUp.addEventListener("click", () => {
     void transposeSelectedSong(1);
   });
@@ -454,8 +462,10 @@ async function handleSessionChange(session) {
     state.selectedSongId = null;
     state.selectedSetlistId = null;
     state.selectedSetlistItemId = null;
+    state.expandedSetlistId = null;
     state.workspaceMode = "songs";
     state.activeTab = "edit";
+    state.setlistActiveTab = "preview";
     closePerformanceMode();
     clearPendingDelete();
     showAuthScreen();
@@ -1033,7 +1043,18 @@ async function createSetlist() {
 function selectSetlist(setlistId) {
   const setlist = state.setlists.find((entry) => entry.id === setlistId);
   state.workspaceMode = "setlists";
+  if (state.selectedSetlistId === setlistId && state.expandedSetlistId === setlistId) {
+    state.expandedSetlistId = null;
+    state.selectedSetlistId = null;
+    state.selectedSetlistItemId = null;
+    state.selectedSongId = null;
+    render();
+    return;
+  }
+
   state.selectedSetlistId = setlistId;
+  state.expandedSetlistId = setlistId;
+  state.setlistActiveTab = "preview";
 
   if (setlist?.items?.length) {
     state.selectedSetlistItemId = setlist.items[0].id;
@@ -1282,6 +1303,7 @@ function render() {
   elements.autoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   elements.setlistAutoScrollSpeed.value = state.autoScrollSpeed.toFixed(1);
   renderTabs();
+  renderSetlistTabs();
   renderWorkspaceTabs();
   renderSongList();
   renderSetlistList();
@@ -1324,6 +1346,19 @@ function renderTabs() {
   elements.previewPanel.classList.toggle("active", !isEditTab);
   elements.editPanel.hidden = !isEditTab;
   elements.previewPanel.hidden = isEditTab;
+}
+
+function renderSetlistTabs() {
+  const isEditTab = state.setlistActiveTab === "edit";
+
+  elements.setlistEditTab.classList.toggle("active", isEditTab);
+  elements.setlistPreviewTab.classList.toggle("active", !isEditTab);
+  elements.setlistEditTab.setAttribute("aria-selected", String(isEditTab));
+  elements.setlistPreviewTab.setAttribute("aria-selected", String(!isEditTab));
+  elements.setlistEditPanel.classList.toggle("active", isEditTab);
+  elements.setlistPreviewPanel.classList.toggle("active", !isEditTab);
+  elements.setlistEditPanel.hidden = !isEditTab;
+  elements.setlistPreviewPanel.hidden = isEditTab;
 }
 
 function renderSongList() {
@@ -1375,21 +1410,60 @@ function renderSetlistList() {
   }
 
   elements.setlistList.innerHTML = state.setlists
-    .map((setlist) => `
-      <button
-        class="setlist-item ${setlist.id === state.selectedSetlistId ? "active" : ""}"
-        type="button"
-        data-setlist-id="${setlist.id}"
-      >
-        <strong>${escapeHtml(setlist.name || "Untitled Setlist")}</strong>
-        <span>${setlist.items.length} song${setlist.items.length === 1 ? "" : "s"}</span>
-      </button>
-    `)
+    .map((setlist) => {
+      const isExpanded = state.expandedSetlistId === setlist.id;
+      const itemMarkup = isExpanded
+        ? (setlist.items.length
+            ? setlist.items
+                .map((item) => {
+                  const song = getSongById(item.songId);
+                  const isActiveSong = item.id === state.selectedSetlistItemId;
+                  return `
+                    <button
+                      class="setlist-song-link ${isActiveSong ? "active" : ""}"
+                      type="button"
+                      data-setlist-song-id="${item.songId}"
+                      data-setlist-item-id="${item.id}"
+                    >
+                      ${escapeHtml(song?.title || "Missing song")}
+                    </button>
+                  `;
+                })
+                .join("")
+            : '<div class="setlist-song-empty">No songs yet</div>')
+        : "";
+
+      return `
+        <div class="setlist-tree">
+          <button
+            class="setlist-item ${setlist.id === state.selectedSetlistId ? "active" : ""}"
+            type="button"
+            data-setlist-id="${setlist.id}"
+            aria-expanded="${String(isExpanded)}"
+          >
+            <strong>${escapeHtml(setlist.name || "Untitled Setlist")}</strong>
+            <span>${setlist.items.length} song${setlist.items.length === 1 ? "" : "s"}</span>
+          </button>
+          <div class="setlist-children ${isExpanded ? "expanded" : ""}">
+            ${itemMarkup}
+          </div>
+        </div>
+      `;
+    })
     .join("");
 
   elements.setlistList.querySelectorAll("[data-setlist-id]").forEach((button) => {
     button.addEventListener("click", () => {
       selectSetlist(button.dataset.setlistId);
+    });
+  });
+
+  elements.setlistList.querySelectorAll("[data-setlist-song-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const songId = button.dataset.setlistSongId;
+      state.selectedSetlistItemId = button.dataset.setlistItemId;
+      state.setlistActiveTab = "preview";
+      void selectSong(songId, { trackView: true });
     });
   });
 }
@@ -1436,6 +1510,7 @@ function renderSetlistEditor() {
       const songId = button.dataset.setlistSongId;
       const item = selectedSetlist.items.find((entry) => entry.songId === songId);
       state.selectedSetlistItemId = item?.id || null;
+      state.setlistActiveTab = "preview";
       void selectSong(songId, { trackView: true });
       render();
     });
@@ -1644,6 +1719,20 @@ function switchWorkspaceMode(mode) {
   stopAutoScroll({ reset: true });
   hideChordTooltip();
   state.workspaceMode = mode;
+  render();
+}
+
+function switchSetlistTab(tab) {
+  if (!["edit", "preview"].includes(tab) || state.setlistActiveTab === tab) {
+    return;
+  }
+
+  if (tab !== "preview") {
+    stopAutoScroll({ reset: true });
+    hideChordTooltip();
+  }
+
+  state.setlistActiveTab = tab;
   render();
 }
 

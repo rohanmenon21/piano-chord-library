@@ -337,113 +337,140 @@
           <section id="setlists-workspace" class="workspace-view" role="tabpanel" hidden>
             <div class="setlists-layout">
               <section class="setlists-detail">
-                <section id="setlist-editor" class="setlist-editor">
-                  <div class="section-heading">
-                    <p class="eyebrow">Setlist Builder</p>
-                    <h2 id="setlist-title">Select a setlist</h2>
-                  </div>
+                <div class="mode-tabs" role="tablist" aria-label="Setlist workspace mode">
+                  <button
+                    id="setlist-edit-tab"
+                    class="tab-button"
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="setlist-edit-panel"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    id="setlist-preview-tab"
+                    class="tab-button active"
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="setlist-preview-panel"
+                  >
+                    Preview
+                  </button>
+                </div>
 
-                  <form id="setlist-form" class="song-form">
-                    <label class="field">
-                      <span>Setlist Name</span>
-                      <input id="setlist-name" type="text" />
-                    </label>
+                <section id="setlist-edit-panel" class="tab-panel" role="tabpanel" hidden>
+                  <section id="setlist-editor" class="setlist-editor">
+                    <div class="section-heading">
+                      <p class="eyebrow">Setlist Builder</p>
+                      <h2 id="setlist-title">Select a setlist</h2>
+                    </div>
 
-                    <div class="setlist-add-row">
+                    <form id="setlist-form" class="song-form">
                       <label class="field">
-                        <span>Add Song</span>
-                        <select id="setlist-song-select"></select>
+                        <span>Setlist Name</span>
+                        <input id="setlist-name" type="text" />
                       </label>
-                      <button id="add-setlist-song-button" class="primary-button" type="button">
-                        Add Song
-                      </button>
-                    </div>
 
-                    <div id="setlist-items" class="setlist-items"></div>
+                      <div class="setlist-add-row">
+                        <label class="field">
+                          <span>Add Song</span>
+                          <select id="setlist-song-select"></select>
+                        </label>
+                        <button id="add-setlist-song-button" class="primary-button" type="button">
+                          Add Song
+                        </button>
+                      </div>
 
-                    <div class="form-actions">
-                      <button class="primary-button" type="submit">Save Setlist</button>
-                      <span id="setlist-save-status" class="save-status" aria-live="polite">
-                        Saved
-                      </span>
-                      <button id="delete-setlist-button" class="ghost-button" type="button">
-                        Delete Setlist
-                      </button>
-                    </div>
-                  </form>
+                      <div id="setlist-items" class="setlist-items"></div>
+
+                      <div class="form-actions">
+                        <button class="primary-button" type="submit">Save Setlist</button>
+                        <span id="setlist-save-status" class="save-status" aria-live="polite">
+                          Saved
+                        </span>
+                        <button id="delete-setlist-button" class="ghost-button" type="button">
+                          Delete Setlist
+                        </button>
+                      </div>
+                    </form>
+                  </section>
                 </section>
 
-                <section class="setlist-preview-card">
-                  <div class="viewer-header">
-                    <div class="section-heading">
-                      <p class="eyebrow">Setlist Preview</p>
-                      <h2 id="setlist-preview-title">Select a setlist</h2>
+                <section id="setlist-preview-panel" class="tab-panel active" role="tabpanel">
+                  <section class="setlist-preview-card">
+                    <div class="viewer-header">
+                      <div class="section-heading">
+                        <p class="eyebrow">Setlist Preview</p>
+                        <h2 id="setlist-preview-title">Select a setlist</h2>
+                      </div>
+
+                      <div class="transpose-panel">
+                        <div class="key-badges">
+                          <span class="badge">
+                            Original: <strong id="setlist-original-key-label">-</strong>
+                          </span>
+                          <span class="badge">
+                            Saved transpose: <strong id="setlist-saved-key-label">-</strong>
+                          </span>
+                        </div>
+
+                        <div class="transpose-controls">
+                          <button id="setlist-preview-prev" class="ghost-button" type="button">
+                            Previous
+                          </button>
+                          <button id="setlist-preview-next" class="ghost-button" type="button">
+                            Next
+                          </button>
+                          <button id="setlist-transpose-down" class="ghost-button" type="button">
+                            - Semitone
+                          </button>
+                          <span id="setlist-transpose-status" class="transpose-status">0</span>
+                          <button id="setlist-transpose-up" class="ghost-button" type="button">
+                            + Semitone
+                          </button>
+                          <button id="setlist-reset-transpose" class="ghost-button" type="button">
+                            Reset
+                          </button>
+                          <button id="setlist-performance-mode-button" class="primary-button" type="button">
+                            Performance Mode
+                          </button>
+                        </div>
+
+                        <div class="auto-scroll-controls" aria-label="Setlist auto scroll controls">
+                          <label class="field auto-scroll-field">
+                            <span>Speed</span>
+                            <select id="setlist-auto-scroll-speed" aria-label="Setlist auto scroll speed">
+                              <option value="0.1" selected>0.1</option>
+                              <option value="0.2">0.2</option>
+                              <option value="0.3">0.3</option>
+                              <option value="0.4">0.4</option>
+                              <option value="0.5">0.5</option>
+                              <option value="0.6">0.6</option>
+                              <option value="0.7">0.7</option>
+                              <option value="0.8">0.8</option>
+                              <option value="0.9">0.9</option>
+                              <option value="1.0">1.0</option>
+                            </select>
+                          </label>
+                          <button id="setlist-auto-scroll-toggle" class="primary-button" type="button">
+                            Start
+                          </button>
+                          <span id="setlist-auto-scroll-status" class="auto-scroll-status" aria-live="polite">
+                            Ready
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div class="transpose-panel">
-                      <div class="key-badges">
-                        <span class="badge">
-                          Original: <strong id="setlist-original-key-label">-</strong>
-                        </span>
-                        <span class="badge">
-                          Saved transpose: <strong id="setlist-saved-key-label">-</strong>
-                        </span>
-                      </div>
-
-                      <div class="transpose-controls">
-                        <button id="setlist-preview-prev" class="ghost-button" type="button">
-                          Previous
-                        </button>
-                        <button id="setlist-preview-next" class="ghost-button" type="button">
-                          Next
-                        </button>
-                        <button id="setlist-transpose-down" class="ghost-button" type="button">
-                          - Semitone
-                        </button>
-                        <span id="setlist-transpose-status" class="transpose-status">0</span>
-                        <button id="setlist-transpose-up" class="ghost-button" type="button">
-                          + Semitone
-                        </button>
-                        <button id="setlist-reset-transpose" class="ghost-button" type="button">
-                          Reset
-                        </button>
-                        <button id="setlist-performance-mode-button" class="primary-button" type="button">
-                          Performance Mode
-                        </button>
-                      </div>
-
-                      <div class="auto-scroll-controls" aria-label="Setlist auto scroll controls">
-                        <label class="field auto-scroll-field">
-                          <span>Speed</span>
-                          <select id="setlist-auto-scroll-speed" aria-label="Setlist auto scroll speed">
-                            <option value="0.1" selected>0.1</option>
-                            <option value="0.2">0.2</option>
-                            <option value="0.3">0.3</option>
-                            <option value="0.4">0.4</option>
-                            <option value="0.5">0.5</option>
-                            <option value="0.6">0.6</option>
-                            <option value="0.7">0.7</option>
-                            <option value="0.8">0.8</option>
-                            <option value="0.9">0.9</option>
-                            <option value="1.0">1.0</option>
-                          </select>
-                        </label>
-                        <button id="setlist-auto-scroll-toggle" class="primary-button" type="button">
-                          Start
-                        </button>
-                        <span id="setlist-auto-scroll-status" class="auto-scroll-status" aria-live="polite">
-                          Ready
-                        </span>
-                      </div>
+                    <div class="preview-meta">
+                      <span id="setlist-preview-artist" class="pill subtle">Artist</span>
+                      <span id="setlist-preview-song-key" class="pill subtle">Key</span>
                     </div>
-                  </div>
 
-                  <div class="preview-meta">
-                    <span id="setlist-preview-artist" class="pill subtle">Artist</span>
-                    <span id="setlist-preview-song-key" class="pill subtle">Key</span>
-                  </div>
-
-                  <pre id="setlist-song-preview" class="song-preview">Select a setlist to preview its songs.</pre>
+                    <pre id="setlist-song-preview" class="song-preview">Select a setlist to preview its songs.</pre>
+                  </section>
                 </section>
               </section>
             </div>
