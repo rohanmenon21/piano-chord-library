@@ -108,11 +108,15 @@
           </button>
         </div>
 
-        <section id="songs-sidebar-panel" class="sidebar-panel active" role="tabpanel">
-          <button id="new-song-button" class="primary-button" type="button">
-            New Song
-          </button>
+        <button id="new-song-button" class="primary-button" type="button">
+          New Song
+        </button>
 
+        <button id="new-setlist-button" class="primary-button" type="button" hidden>
+          New Setlist
+        </button>
+
+        <section id="songs-sidebar-panel" class="sidebar-panel active" role="tabpanel">
           <section class="song-list-panel">
             <div class="song-list-header">
               <h2>Songs</h2>
@@ -143,9 +147,6 @@
               <h2>Setlists</h2>
               <span id="setlist-count" class="pill">0</span>
             </div>
-            <button id="new-setlist-button" class="primary-button" type="button">
-              New Setlist
-            </button>
             <div id="setlist-list" class="song-list" aria-live="polite"></div>
           </section>
         </section>

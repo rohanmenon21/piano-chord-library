@@ -166,6 +166,11 @@ select {
   flex: 1;
 }
 
+#new-song-button,
+#new-setlist-button {
+  width: 100%;
+}
+
 .brand h1,
 .section-heading h2 {
   margin: 0;
@@ -401,6 +406,8 @@ select {
 
 .mode-tabs {
   margin-bottom: 24px;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .workspace-view {

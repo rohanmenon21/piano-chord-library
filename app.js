@@ -1325,6 +1325,8 @@ function renderWorkspaceTabs() {
   elements.setlistsSidebarPanel.classList.toggle("active", !isSongs);
   elements.songsSidebarPanel.hidden = !isSongs;
   elements.setlistsSidebarPanel.hidden = isSongs;
+  elements.newSongButton.hidden = !isSongs;
+  elements.newSetlistButton.hidden = isSongs;
 }
 
 function renderWorkspacePanels() {
