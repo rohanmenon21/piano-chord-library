@@ -133,9 +133,14 @@
               Your songs are private to your account and synced online.
             </p>
           </div>
-          <button id="profile-button" class="ghost-button" type="button">
-            Account
-          </button>
+          <div class="app-header-actions">
+            <button id="help-button" class="ghost-button" type="button">
+              Help
+            </button>
+            <button id="profile-button" class="ghost-button" type="button">
+              Account
+            </button>
+          </div>
         </header>
 
         <section class="workspace-card">
@@ -391,6 +396,259 @@
         </form>
 
         <p id="profile-status" class="auth-status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section id="help-screen" class="help-screen" hidden>
+      <div class="help-card">
+        <div class="help-header">
+          <div>
+            <p class="eyebrow">Help &amp; Instructions</p>
+            <h2>How to Use Piano Chord Library</h2>
+            <p class="header-copy">
+              This guide walks through every major feature in the app, from saving your
+              first song to using setlists and performance mode live.
+            </p>
+          </div>
+          <button id="help-close" class="ghost-button" type="button">
+            Back
+          </button>
+        </div>
+
+        <div class="help-layout">
+          <nav class="help-toc" aria-label="Help contents">
+            <h3>Contents</h3>
+            <a href="#help-getting-started">Getting Started</a>
+            <a href="#help-song-editing">Creating and Editing Songs</a>
+            <a href="#help-tabs">Edit and Preview Tabs</a>
+            <a href="#help-transpose">Transposing and Saved Keys</a>
+            <a href="#help-import">Import From URL</a>
+            <a href="#help-sorting">Sorting and Search</a>
+            <a href="#help-delete">Deleting Songs and Undo</a>
+            <a href="#help-chords">Chord Hover Preview and Voicings</a>
+            <a href="#help-setlists">Setlists</a>
+            <a href="#help-performance">Performance Mode</a>
+            <a href="#help-autoscroll">Auto-Scroll</a>
+            <a href="#help-account">Account and Profile</a>
+          </nav>
+
+          <article class="help-content">
+            <section id="help-getting-started" class="help-section">
+              <h3>Getting Started</h3>
+              <p>
+                Piano Chord Library is a private online song organizer for chord sheets.
+                Each user signs into their own account and only sees their own songs,
+                setlists, and saved transpositions.
+              </p>
+              <ol>
+                <li>Sign in or create an account from the login screen.</li>
+                <li>Use <strong>New Song</strong> to start a blank song.</li>
+                <li>Paste your lyrics and chord sheet into the song editor.</li>
+                <li>Switch to <strong>Preview</strong> to see the formatted result.</li>
+              </ol>
+              <p>
+                Use this first when you want a simple home for your music library that
+                stays synced to your account across devices.
+              </p>
+            </section>
+
+            <section id="help-song-editing" class="help-section">
+              <h3>Creating and Editing Songs</h3>
+              <p>
+                Songs are created from the left sidebar and edited in the main workspace.
+                Draft songs appear at the top until they are saved.
+              </p>
+              <ol>
+                <li>Click <strong>New Song</strong>.</li>
+                <li>Enter the song title, artist, and original key.</li>
+                <li>Paste the song content into the large text area.</li>
+                <li>Click <strong>Save Song</strong> or let autosave store your changes.</li>
+              </ol>
+              <p>
+                This is best for adding your own custom arrangements, church charts, or
+                personal lyric sheets.
+              </p>
+            </section>
+
+            <section id="help-tabs" class="help-section">
+              <h3>Edit and Preview Tabs</h3>
+              <p>
+                The workspace has two tabs so writing and reading stay separate.
+              </p>
+              <ol>
+                <li>Use <strong>Edit</strong> to change the raw song text and metadata.</li>
+                <li>Use <strong>Preview</strong> to see chords highlighted above the lyrics.</li>
+                <li>Selecting an existing saved song opens it in <strong>Preview</strong>.</li>
+                <li>Creating a new song starts you in <strong>Edit</strong>.</li>
+              </ol>
+              <p>
+                Use Preview when you want a cleaner playing view without editing controls
+                in the way.
+              </p>
+            </section>
+
+            <section id="help-transpose" class="help-section">
+              <h3>Transposing and Saved Keys</h3>
+              <p>
+                Every song keeps both its original key and its currently saved transposed
+                key. The app remembers the saved transpose for that song.
+              </p>
+              <ol>
+                <li>Open a song in <strong>Preview</strong> or <strong>Performance Mode</strong>.</li>
+                <li>Use <strong>- Semitone</strong> or <strong>+ Semitone</strong> to shift the chords.</li>
+                <li>Watch the key badges update to show the original key and saved key.</li>
+                <li>Use <strong>Reset</strong> to go back to the original arrangement.</li>
+              </ol>
+              <p>
+                This is useful when a singer needs a different key but you still want to
+                remember the chart’s original starting point.
+              </p>
+            </section>
+
+            <section id="help-import" class="help-section">
+              <h3>Import From URL</h3>
+              <p>
+                The import tool tries to fetch a chord-and-lyrics page and pull the song
+                text into the current draft automatically.
+              </p>
+              <ol>
+                <li>Open the <strong>Edit</strong> tab.</li>
+                <li>Paste a web page link into <strong>Import From URL</strong>.</li>
+                <li>Click <strong>Import</strong>.</li>
+                <li>Review the imported result and save the song.</li>
+              </ol>
+              <p>
+                Use this when you already found a chord chart online and want to bring it
+                into your own library quickly. Some websites may still block imports.
+              </p>
+            </section>
+
+            <section id="help-sorting" class="help-section">
+              <h3>Sorting and Search</h3>
+              <p>
+                The song list can be filtered and sorted to make a growing library easier
+                to manage.
+              </p>
+              <ol>
+                <li>Use the <strong>Sort by</strong> dropdown above the song list.</li>
+                <li>Choose <strong>Most Recent Viewed</strong>, <strong>Song Name</strong>, or <strong>Artist Name</strong>.</li>
+                <li>Type in the search box to filter the visible song list.</li>
+                <li>Your sort preference is saved to your account automatically.</li>
+              </ol>
+              <p>
+                Use recent viewed during rehearsals, and alphabetical sorts when you want
+                to clean up or browse the full library.
+              </p>
+            </section>
+
+            <section id="help-delete" class="help-section">
+              <h3>Deleting Songs and Undo</h3>
+              <p>
+                Deleting a song removes it right away, but you get a short undo window in
+                case it was accidental.
+              </p>
+              <ol>
+                <li>Select a saved song.</li>
+                <li>Click <strong>Delete Song</strong>.</li>
+                <li>Use the <strong>Undo</strong> popup if you want to restore it.</li>
+                <li>If the undo window expires, the song stays deleted.</li>
+              </ol>
+              <p>
+                This is helpful when cleaning your library while still giving yourself a
+                quick recovery option.
+              </p>
+            </section>
+
+            <section id="help-chords" class="help-section">
+              <h3>Chord Hover Preview and Voicings</h3>
+              <p>
+                In Preview, real chords are highlighted. Hovering them opens a piano view
+                so you can see how to play the chord visually.
+              </p>
+              <ol>
+                <li>Open a song in <strong>Preview</strong>.</li>
+                <li>Hover over a highlighted chord name.</li>
+                <li>Use the small left and right arrows in the popup to change voicings.</li>
+                <li>Move away and come back to the same chord to see your last selected voicing again.</li>
+              </ol>
+              <p>
+                Use this when you want quick on-screen chord guidance without leaving the
+                song chart.
+              </p>
+            </section>
+
+            <section id="help-setlists" class="help-section">
+              <h3>Setlists</h3>
+              <p>
+                Setlists let you build ordered groups of saved songs for a service,
+                performance, or practice session.
+              </p>
+              <ol>
+                <li>Click <strong>New Setlist</strong> in the sidebar.</li>
+                <li>Name the setlist and use <strong>Add Song</strong> to include songs from your library.</li>
+                <li>Use <strong>Up</strong> and <strong>Down</strong> to reorder items.</li>
+                <li>Click a song inside the setlist editor to open it in Preview.</li>
+              </ol>
+              <p>
+                Use setlists when you want a fixed song order for a rehearsal, worship set,
+                or event.
+              </p>
+            </section>
+
+            <section id="help-performance" class="help-section">
+              <h3>Performance Mode</h3>
+              <p>
+                Performance Mode opens a cleaner full-screen reading view for live playing.
+              </p>
+              <ol>
+                <li>Open a song in <strong>Preview</strong>.</li>
+                <li>Click <strong>Performance Mode</strong>.</li>
+                <li>If you opened it from a setlist song, use <strong>Previous</strong> and <strong>Next</strong> to move through the setlist.</li>
+                <li>Click <strong>Exit</strong> to return to the main app.</li>
+              </ol>
+              <p>
+                Use this on stage or in rehearsal when you want large, distraction-free
+                song text.
+              </p>
+            </section>
+
+            <section id="help-autoscroll" class="help-section">
+              <h3>Auto-Scroll</h3>
+              <p>
+                Auto-scroll is available in both Preview and Performance Mode for longer
+                songs that need hands-free scrolling.
+              </p>
+              <ol>
+                <li>Set the <strong>Speed</strong> value between <strong>0.1</strong> and <strong>1.0</strong>.</li>
+                <li>Click <strong>Start</strong> to begin scrolling.</li>
+                <li>Click the same button again to <strong>Pause</strong>, then <strong>Resume</strong>.</li>
+                <li>The controls stay visible while the song scrolls.</li>
+              </ol>
+              <p>
+                This is useful when you are playing continuously and do not want to touch
+                the trackpad or screen as often.
+              </p>
+            </section>
+
+            <section id="help-account" class="help-section">
+              <h3>Account and Profile</h3>
+              <p>
+                Your account page manages the personal information tied to your private
+                hosted library.
+              </p>
+              <ol>
+                <li>Click <strong>Account</strong> in the top-right corner.</li>
+                <li>Update your display name if needed.</li>
+                <li>Review the email address attached to the account.</li>
+                <li>Use <strong>Sign Out</strong> when you are done, especially on shared devices.</li>
+              </ol>
+              <p>
+                Use this to keep your profile accurate and make sure you are working in the
+                correct personal library.
+              </p>
+            </section>
+          </article>
+        </div>
       </div>
     </section>
 

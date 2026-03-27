@@ -145,6 +145,9 @@ const elements = {
   authToggle: document.querySelector("#auth-toggle"),
   authStatus: document.querySelector("#auth-status"),
   appShell: document.querySelector("#app-shell"),
+  helpScreen: document.querySelector("#help-screen"),
+  helpButton: document.querySelector("#help-button"),
+  helpClose: document.querySelector("#help-close"),
   profileScreen: document.querySelector("#profile-screen"),
   profileButton: document.querySelector("#profile-button"),
   profileClose: document.querySelector("#profile-close"),
@@ -274,6 +277,8 @@ function bindEvents() {
     void handleAuthSubmit(event);
   });
   elements.authToggle.addEventListener("click", toggleAuthMode);
+  elements.helpButton.addEventListener("click", openHelpScreen);
+  elements.helpClose.addEventListener("click", closeHelpScreen);
   elements.profileButton.addEventListener("click", openProfileScreen);
   elements.profileClose.addEventListener("click", closeProfileScreen);
   elements.profileForm.addEventListener("submit", (event) => {
@@ -430,8 +435,9 @@ function setLoadingState(message) {
   elements.loadingScreen.hidden = false;
   elements.authShell.hidden = true;
   elements.appShell.hidden = true;
+  elements.helpScreen.hidden = true;
   elements.profileScreen.hidden = true;
-  elements.body.classList.remove("modal-open");
+  syncModalState();
 }
 
 function showAuthScreen({ preserveStatus = false } = {}) {
@@ -439,8 +445,9 @@ function showAuthScreen({ preserveStatus = false } = {}) {
   elements.loadingScreen.hidden = true;
   elements.authShell.hidden = false;
   elements.appShell.hidden = true;
+  elements.helpScreen.hidden = true;
   elements.profileScreen.hidden = true;
-  elements.body.classList.remove("modal-open");
+  syncModalState();
   updateAuthMode({ preserveStatus });
 }
 
@@ -449,11 +456,32 @@ function showAppScreen() {
   elements.loadingScreen.hidden = true;
   elements.authShell.hidden = true;
   elements.appShell.hidden = false;
+  elements.helpScreen.hidden = true;
   elements.profileScreen.hidden = true;
-  elements.body.classList.remove("modal-open");
+  syncModalState();
   updateLibraryHeader();
   updateProfileForm();
   render();
+}
+
+function syncModalState() {
+  const hasOpenOverlay =
+    state.performanceMode.active || !elements.profileScreen.hidden || !elements.helpScreen.hidden;
+  elements.body.classList.toggle("modal-open", hasOpenOverlay);
+}
+
+function openHelpScreen() {
+  if (!state.user) {
+    return;
+  }
+
+  elements.helpScreen.hidden = false;
+  syncModalState();
+}
+
+function closeHelpScreen() {
+  elements.helpScreen.hidden = true;
+  syncModalState();
 }
 
 function openProfileScreen() {
@@ -463,12 +491,12 @@ function openProfileScreen() {
 
   updateProfileForm();
   elements.profileScreen.hidden = false;
-  elements.body.classList.add("modal-open");
+  syncModalState();
 }
 
 function closeProfileScreen() {
   elements.profileScreen.hidden = true;
-  elements.body.classList.toggle("modal-open", state.performanceMode.active);
+  syncModalState();
 }
 
 function toggleAuthMode() {
@@ -556,6 +584,7 @@ async function signOut() {
     return;
   }
 
+  closeHelpScreen();
   await state.supabase.auth.signOut();
   closeProfileScreen();
 }
@@ -2223,7 +2252,7 @@ function openPerformanceMode() {
   }
   hideChordTooltip();
   state.performanceMode.active = true;
-  elements.body.classList.add("modal-open");
+  syncModalState();
   renderPerformanceMode();
 }
 
@@ -2233,7 +2262,7 @@ function closePerformanceMode() {
   }
   stopAutoScroll({ reset: true });
   state.performanceMode.active = false;
-  elements.body.classList.toggle("modal-open", !elements.profileScreen.hidden);
+  syncModalState();
   renderPerformanceMode();
 }
 
@@ -2241,7 +2270,7 @@ function renderPerformanceMode() {
   const selectedSong = getSelectedSong();
   const selectedSetlist = getSelectedSetlist();
   elements.performanceScreen.hidden = !state.performanceMode.active;
-  elements.body.classList.toggle("modal-open", state.performanceMode.active || !elements.profileScreen.hidden);
+  syncModalState();
 
   if (!state.performanceMode.active || !selectedSong) {
     return;

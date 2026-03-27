@@ -54,7 +54,8 @@ select {
 
 .loading-screen,
 .auth-shell,
-.profile-screen {
+.profile-screen,
+.help-screen {
   min-height: 100vh;
   padding: 24px;
 }
@@ -67,7 +68,8 @@ select {
 
 .loading-card,
 .auth-card,
-.profile-card {
+.profile-card,
+.help-card {
   width: min(100%, 560px);
   padding: 32px;
   border-radius: var(--radius-xl);
@@ -94,13 +96,19 @@ select {
 .auth-actions,
 .profile-actions,
 .app-header,
-.profile-header {
+.profile-header,
+.help-header,
+.app-header-actions {
   display: flex;
   gap: 12px;
 }
 
 .auth-actions,
 .profile-actions {
+  align-items: center;
+}
+
+.app-header-actions {
   align-items: center;
 }
 
@@ -490,6 +498,97 @@ select {
   width: min(100%, 640px);
 }
 
+.help-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 20, 10, 0.32);
+  backdrop-filter: blur(6px);
+}
+
+.help-card {
+  width: min(100%, 1120px);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.help-header {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.help-header h2,
+.help-section h3,
+.help-toc h3 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+}
+
+.help-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 24px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.help-toc,
+.help-content {
+  min-height: 0;
+  overflow: auto;
+}
+
+.help-toc {
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 248, 239, 0.72);
+}
+
+.help-toc a {
+  color: var(--accent-dark);
+  text-decoration: none;
+  line-height: 1.45;
+}
+
+.help-toc a:hover {
+  text-decoration: underline;
+}
+
+.help-content {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-right: 8px;
+}
+
+.help-section {
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: rgba(255, 251, 245, 0.78);
+}
+
+.help-section p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.help-section ol {
+  margin: 0 0 14px;
+  padding-left: 1.25rem;
+  line-height: 1.7;
+}
+
 .performance-screen {
   position: fixed;
   inset: 0;
@@ -857,7 +956,8 @@ select {
   }
 
   .app-header,
-  .profile-header {
+  .profile-header,
+  .help-header {
     flex-direction: column;
     align-items: stretch;
   }
@@ -876,7 +976,8 @@ select {
 
   .auth-shell,
   .loading-screen,
-  .profile-screen {
+  .profile-screen,
+  .help-screen {
     padding: 16px;
   }
 
@@ -931,9 +1032,23 @@ select {
   }
 
   .auth-actions,
-  .profile-actions {
+  .profile-actions,
+  .app-header-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .help-card {
+    max-height: calc(100vh - 32px);
+    padding: 24px;
+  }
+
+  .help-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .help-toc {
+    max-height: 220px;
   }
 
   .tooltip-controls {
