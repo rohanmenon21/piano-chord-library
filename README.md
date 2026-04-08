@@ -22,6 +22,14 @@ A hosted piano chord web app with private user accounts, per-user song libraries
 - In-app help and instructions
 - Profile page with display name and sign-out
 
+## Documentation
+
+If you want to understand the app more deeply, start here:
+
+- [`docs/overview.md`](docs/overview.md) for a beginner-friendly explanation of what the app is and how the major parts fit together
+- [`docs/architecture.md`](docs/architecture.md) for the file-by-file architecture and dependency map
+- [`docs/glossary.md`](docs/glossary.md) for plain-English definitions of technical and musical terms
+
 ## Supabase Setup
 
 1. Create a Supabase project.
