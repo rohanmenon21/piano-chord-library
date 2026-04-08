@@ -49,7 +49,9 @@ The frontend fetches those values from [`api/config.js`](/Users/rohanmenon/Docum
 
 ## Local Development
 
-1. Copy [`.env.example`](/Users/rohanmenon/Documents/New project/.env.example) values into your Vercel/local environment setup.
+This project is validated against Node 24 LTS.
+
+1. Create a local [`.env`](/Users/rohanmenon/Documents/Development/piano-chord-library/.env) file from [`.env.example`](/Users/rohanmenon/Documents/Development/piano-chord-library/.env.example) and fill in your Supabase URL and anon key.
 2. Run the app through a web server or Vercel dev, not by opening `index.html` directly from `file://`.
 3. Add `?mock=1` to the URL if you want to run the app against seeded in-memory data instead of Supabase.
 

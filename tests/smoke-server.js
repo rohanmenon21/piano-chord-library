@@ -5,6 +5,9 @@ import { readFile } from "node:fs/promises";
 import configHandler from "../api/config.js";
 
 const projectRoot = resolve(process.cwd());
+
+await loadDotEnvFile();
+
 process.env.SUPABASE_URL ??= "https://example.supabase.co";
 process.env.SUPABASE_ANON_KEY ??= "smoke-test";
 
@@ -34,6 +37,43 @@ function createResponseAdapter(res) {
       res.end(body);
     },
   };
+}
+
+async function loadDotEnvFile() {
+  const envFilePath = join(projectRoot, ".env");
+
+  try {
+    const raw = await readFile(envFilePath, "utf8");
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        continue;
+      }
+
+      const exportPrefix = trimmed.startsWith("export ") ? trimmed.slice(7) : trimmed;
+      const equalsIndex = exportPrefix.indexOf("=");
+      if (equalsIndex === -1) {
+        continue;
+      }
+
+      const key = exportPrefix.slice(0, equalsIndex).trim();
+      if (!key) {
+        continue;
+      }
+
+      let value = exportPrefix.slice(equalsIndex + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      process.env[key] = value;
+    }
+  } catch {
+    // Local `.env` files are optional.
+  }
 }
 
 const server = createServer(async (req, res) => {

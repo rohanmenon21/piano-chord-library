@@ -2,12 +2,16 @@
   "name": "piano-chord-library",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "node tests/smoke-server.js",
     "test": "playwright test",
     "test:smoke": "playwright test tests/app-smoke.spec.js"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0"
+    "@playwright/test": "^1.52.0",
+    "vercel": "^50.41.0"
   }
 }
